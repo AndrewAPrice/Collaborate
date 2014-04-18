@@ -1,0 +1,10 @@
+{
+  "name": "Collaborate",
+  "version": "0.0.0",
+  "description": "Collaborate",
+  "main": "app.js",
+  "author": {
+    "name": "andpri",
+    "email": ""
+  }
+}
