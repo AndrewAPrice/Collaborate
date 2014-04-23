@@ -1,0 +1,51 @@
+#titlebar {
+    background-color: #D1D1D1;
+    color: black;
+    overflow: hidden;
+
+    text-align: center;
+}
+
+#titlebar-left {
+    float: left;
+    text-align: left;
+}
+
+#titlebar-right {
+    float: right;
+    text-align: right;
+}
+
+.centre {
+    text-align: center;
+    margin-left:auto; 
+    margin-right:auto;
+}
+
+.highlightButton:active, .highlightButton:visited, .highlightButton:active .highlightButton a {
+    color: black;
+}
+
+.highlightButton:hover {
+    color: black;
+    background-color: #a3a3a3;
+}
+
+body {
+    margin: 0px;
+    padding: 0px;
+}
+
+.loading {
+    background-color: white;
+    background-image: url('/client/loader.gif');
+    background-repeat: no-repeat;
+    background-attachment: local;
+    background-position: center;
+    position: relative;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+}

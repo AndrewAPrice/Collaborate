@@ -1,0 +1,169 @@
+﻿<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title></title>
+        <script type="text/javascript" src="/client/jquery-1.11.0.min.js"></script>
+        <script type="text/javascript" src="/client/tinymce/tinymce.min.js"></script>
+        <script type="text/javascript" src="/client/jqwidgets/jqwidgets/jqx-all.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+
+        <link rel="stylesheet" href="/client/jqwidgets/jqwidgets/styles/jqx.base.css" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="/client/style.css" />
+    </head>
+    <body>
+        <div id="titlebar">
+            <span id="WikiName">&nbsp;</span>
+
+            <div id="titlebar-left">
+                [Search] <a href="#" class="highlightButton">(Search)</a>
+                <a href="#" class="highlightButton">(Info)</a>
+                <a href="#" class="highlightButton">(Share)</a>
+                <a href="#" class="highlightButton">(Print)</a>
+
+            </div>
+
+            <div id="titlebar-right">
+                <a href="#" class="highlightButton">(Message?)</a>
+                <a href="#" class="highlightButton"><span id="loginName">Log in</span></a>
+                <script type="text/javascript">
+                    $(function () {
+                        $("#loginName").click(function () {
+                            if(!loggedIn)
+                                showLoginWindow();
+                        });
+                    });
+                </script>
+            </div>
+
+            <script type="text/javascript">
+                var resizeTitleBar = function () {
+                    // resize left/right title floats to be the same size, to centre the header text
+
+                    // get their real sizes
+                    $("#titlebar-left").width('auto');
+                    $("#titlebar-right").width('auto');
+
+                    // resize to the largest
+                    var newWidth = Math.max($("#titlebar-left").width(), $("#titlebar-right").width());
+                    $("#titlebar-left").width(newWidth);
+                    $("#titlebar-right").width(newWidth);
+                };
+            </script>
+        </div>
+        <div class="editable"">
+                     <p>This is an editable div container.</p>
+                     <p>Follow us on <a href="http://twitter.com/alohaeditor">Twitter</a>.</p>
+                     <ul>
+                            <li>list item one</li>
+                            <li>list item two</li>
+                     </ul>
+        </div>
+
+        <!-- windows -->
+        <div id="wndLogin">
+            <div id="windowHeader">Log in</div>
+            <div id="windowContent" class="centre">
+                <div id="loginContent">
+                    <table class="centre">
+                        <tr><td>Username:</td><td><input type="text" id="tbLoginUsername" /></td></tr>
+                        <tr><td>Password:</td><td><input type="password" id="tbLoginPassword" /></td></tr>
+                    </table>
+                    <br />
+                        <input type="button" value="Log in" id="btnLoginLogin" />
+                        <input type="button" value="Cancel" id="btnLoginCancel" />
+                        <input type="button" value="Create an account" id="btnLoginCreateAnAccount" />
+                </div>
+
+                <div class="loading" id="loginLoading"></div>
+            </div>
+        </div>
+        <script type="text/javascript">
+            $(function () {
+                $("#wndLogin").jqxWindow({ width: '300px', height: '130px', autoOpen: false });
+
+                $("#tbLoginUsername").jqxInput().width("100%");
+                $("#tbLoginPassword").jqxInput().width("100%");
+                $("#btnLoginLogin").jqxButton();
+                $("#btnLoginCancel").jqxButton();
+                $("#btnLoginCancel").click(function () {
+                    $("#wndLogin").jqxWindow("hide");
+                });
+                $("#btnLoginCreateAnAccount").jqxButton();
+                $("#loginLoading").hide();
+            });
+
+            var showLoginWindow = function() {
+                $("#wndLogin").jqxWindow("show");
+                $("#tbLoginUsername").val("");
+                $("#tbLoginPassword").val("");
+
+                // get global user settings
+                if (globalUserSettings == null) {
+                    $("#loginLoading").show();
+                    $("#loginContent").hide();
+                    socket.emit('getGlobalUserSettings', null);
+                }
+            };
+        </script>
+
+        <script type="text/javascript">
+            var socket = null; // socket object
+            var globalSettings = null; // global wiki settings
+            var globalUserSettings = null; // global user settings
+
+            var loggedIn = false; // is the user logged in?
+
+
+            var resize = function () {
+                // resize TinyMCE to take up the window
+                var newHeight = window.innerHeight - 145;
+                $(".mce-edit-area").height(newHeight);
+                $("#mce_0_ifr").height(newHeight);
+            };
+
+            $(function () {
+                resizeTitleBar();
+                /*
+                tinymce.init({
+                    selector: ".editable",
+                    width: "100%-10px",
+                    plugins: [
+                        "advlist autolink lists link image charmap print preview hr anchor pagebreak",
+                        "searchreplace wordcount visualblocks visualchars code fullscreen",
+                        "insertdatetime media nonbreaking save table contextmenu directionality",
+                        "emoticons template paste textcolor"
+                    ],
+                    toolbar: "insertfile undo redo | styleselect | bold italic | forecolor backcolor emoticons | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media",
+                    setup: function (ed) {
+                        ed.on('load', resize);
+                    }
+                });*/
+                
+                $(window).resize(resize);
+
+                // socket stuff
+                socket = io.connect();
+                socket.on('globalSettings', function (data) {
+                    globalSettings = data;
+                    $("#WikiName").text(globalSettings.wikiName);
+                });
+
+                socket.on('globalUserSettings', function (data) {
+                    globalUserSettings = data;
+
+                    // show login window content
+                    $("#loginLoading").hide();
+                    $("#loginContent").show();
+
+                    console.log(globalUserSettings);
+
+                    if (globalUserSettings.canRegister) {
+                        $("#btnLoginCreateAnAccount").show();
+                    } else {
+                        $("#btnLoginCreateAnAccount").hide();
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>
