@@ -22,15 +22,37 @@ var isValidPassword = function(password) {
     return true;
 };
 
-// the password rule to display to users
-var passwordRules = "Passwords must be at least 6 characters long.";
-
 // authenticates a user, returns the user object if the credentials are valid, null otherwise
-exports.authenticate = function(username, password) {
+exports.authenticate = function(username, password, socket) {
     // conver the username to lower case and trim it, so we can use it as a key
     username = username.toLowerCase().trim();
 
-    return false;
+    // check if the user exists
+    var user = users.object[username];
+    if(user === undefined)
+        return { status: "nouser" };
+
+    // check password
+    if(user.password !== password)
+        return { status: "badpassword" };
+
+    
+    socket.loggedIn = true;
+    socket.niceUsername = user.Username;
+    socket.username = username; // key form (trimed, lowercase)
+
+    return { status: "success", username: user.username, newMessages: 0, uiMessages: {}};
+};
+
+exports.logout = function(username, socket) {
+};
+
+// these are some global settings
+exports.globalSettings = {
+    // Can users register through the site? If this is false Administrators must manually add new users.
+    canRegister: false,
+    // password requirements to display to the user
+    passwordRequirements:  "Passwords must be at least 6 characters long."
 };
 
 exports.createUser = function(userinfo) {
