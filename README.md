@@ -1,5 +1,10 @@
 ﻿# Collaborate
 
+## Directory Structure
+/ - Node.js code
+/client - client-side code that runs in the web browser
+/storage - where the Wiki stores its data
+
 ## Requirements
 You need Node.js installed, and install the following dependencies via npm:
 - express
