@@ -5,6 +5,11 @@
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
     <Name>Collaborate</Name>
     <RootNamespace>Collaborate</RootNamespace>
+    <NodeExePath />
+    <NodeExeArguments />
+    <ScriptArguments />
+    <NodejsPort />
+    <LaunchUrl>http://localhost:81/</LaunchUrl>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -31,10 +36,13 @@
   <ItemGroup>
     <Compile Include="app.js" />
     <Compile Include="JSONStorage.js" />
+    <Compile Include="Server.js" />
+    <Content Include="client\index.html" />
     <Content Include="package.json" />
     <Content Include="README.md" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="client\" />
     <Folder Include="storage\" />
   </ItemGroup>
   <Import Project="$(VSToolsPath)\Node.js Tools\Microsoft.NodejsTools.targets" />
