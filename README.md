@@ -1,6 +1,6 @@
 ﻿# Collaborate
 
-Collaborate is a Wiki server that intends to be intiuitive and easy to use.
+Collaborate is a Wiki server that intends to be intuitive and easy to use.
 
 ## Directory Structure
 - / - Node.js code
