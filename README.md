@@ -28,7 +28,7 @@ To run, make sure you have Node.js installed and call:
 node app.js
 
 ## Planned features
-- Intuitive WYIWYG editing of pages.
+- Intuitive WYSIWYG editing of pages.
 - Group and user-based permissions.
 - File and image attachments (including the ability to paste images inline while editing).
 - Automatic updating of the page when a change is made.
