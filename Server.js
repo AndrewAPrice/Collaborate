@@ -10,18 +10,22 @@ var io = require('socket.io').listen(server);
 
 var Users = require('./Users.js');
 
-// global settings for the Wiki
-var globalSettings = {
+// global settings for the Wiki (sent to the user)
+exports.globalSettings = {
     // The wiki name (appears at the top of the wiki)
     wikiName: "Collaborate Test Wiki"
 };
 
-// global server settings for the Wiki
-var globalServerSettings = {
+// global settings for the Wiki (not sent to the user)
+exports.globalServerSettings = {
     // The port we should run the wiki on
     port: 81,
     // Can users access the Wiki without being logged in?
-    publicAccess: true
+    publicAccess: true,
+    // The address that emails coming from the Wiki come from
+    emailAddress: "Collaborate <collaborate@test.com>",
+    // The address that users can access this site at (for sending out links via email)
+    siteAddress: "http://localhost:81/"
 };
 
 app.get('/', function(req, res) {
@@ -37,11 +41,10 @@ app.get(/\/client\/(.*)/, function(req, res) {
     res.sendfile('client/' + req.params[0]);
 });
 
-
 // start the server
 exports.initialize = function() {
     // start the server
-    server.listen(globalServerSettings.port);
+    server.listen(exports.globalServerSettings.port);
 };
 
 // called when a new socket connection is initialized
@@ -49,11 +52,14 @@ io.sockets.on('connection', function(socket) {
     // socket not logged in:
     socket.loggedIn = false;
 
+    // socket id (the username trimmed and in lowercase)
+    socket.userid = "";
+
     // socket username
     socket.username = "";
 
     // send global settings
-    socket.emit('globalSettings', globalSettings);
+    socket.emit('globalSettings', exports.globalSettings);
 
     // user requests global user settings
     socket.on('getGlobalUserSettings', function() {
@@ -63,23 +69,61 @@ io.sockets.on('connection', function(socket) {
 
     // user requests login
     socket.on('login', function(data) {
-        if(typeof data !== 'object' || data.Username === undefined || data.Password === undefined) {
+        // check params were passed in
+        if(typeof data !== 'object' || data.username === undefined || data.password === undefined) {
             socket.emit("loginResponse", { status: "nouser" });
             return;
         }
 
-        var result = Users.authenticate(data.Username, data.Password);
+        // already logged in?
+        if(socket.loggedIn == true)
+            return;
 
-        socket.emit("loginResponse", socket);
-        return;
+        // authenticate
+        Users.authenticate(data.username, data.password, function(response) {
+            if(response.status === "success") {
+                // save user info on socket if successful
+                socket.loggedIn = true;
+                socket.userid = response.id;
+                socket.username = response.username;
+            }
+
+            socket.emit("loginResponse", response);
+        });
     });
+
+    // user requests to create a user
+    socket.on('createUser', function(data) {
+        // check params were passed in
+        if(typeof data !== 'object' || data.username === undefined || data.password === undefined || data.email === undefined
+            // cannot register if we are already logged in
+            || socket.loggedIn == true) {
+            socket.emit("createUserResponse", { status: "badusername" });
+        }
+
+        // create the user
+        Users.createUser(data.username, data.password, data.email, function(response) {
+            socket.emit("createUserResponse", response);
+        });
+    });
+
+    // log the user out
+    var logout = function() {
+        // not logged in?
+        if(socket.loggedIn == false) 
+            return;
+        socket.loggedIn = false;
+        socket.userid = "";
+        socket.username = "";
+    };
 
     // user requests logout
     socket.on('logout', function() {
-        socket.loggedIn = false;
+        logout();
     });
 
     // the user disconnects
     socket.on('disconnect', function() {
+        logout();
     });
 });

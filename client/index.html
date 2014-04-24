@@ -60,10 +60,12 @@
         </div>
 
         <!-- windows -->
+        <!-- login window -->
         <div id="wndLogin">
-            <div id="windowHeader">Log in</div>
-            <div id="windowContent" class="centre">
+            <div >Log in</div>
+            <div class="centre">
                 <div id="loginContent">
+                    <span id="loginMessage"></span>
                     <table class="centre">
                         <tr><td>Username:</td><td><input type="text" id="tbLoginUsername" /></td></tr>
                         <tr><td>Password:</td><td><input type="password" id="tbLoginPassword" /></td></tr>
@@ -79,17 +81,30 @@
         </div>
         <script type="text/javascript">
             $(function () {
-                $("#wndLogin").jqxWindow({ width: '300px', height: '130px', autoOpen: false });
+                $("#wndLogin").jqxWindow({ width: '300px', height: '140px', autoOpen: false });
 
                 $("#tbLoginUsername").jqxInput().width("100%");
                 $("#tbLoginPassword").jqxInput().width("100%");
                 $("#btnLoginLogin").jqxButton();
+                $("#btnLoginLogin").click(function () {
+                    var username = $("#tbLoginUsername").val();
+                    var password = $("#tbLoginPassword").val();
+
+                    $("#loginLoading").show();
+                    $("#loginContent").hide();
+
+                    socket.emit('login', { username: username, password: password });
+
+                });
                 $("#btnLoginCancel").jqxButton();
                 $("#btnLoginCancel").click(function () {
                     $("#wndLogin").jqxWindow("hide");
                 });
                 $("#btnLoginCreateAnAccount").jqxButton();
-                $("#loginLoading").hide();
+                $("#btnLoginCreateAnAccount").click(function () {
+                    $("#wndLogin").jqxWindow("hide");
+                    showCreateUserWindow();
+                });
             });
 
             var showLoginWindow = function() {
@@ -97,21 +112,161 @@
                 $("#tbLoginUsername").val("");
                 $("#tbLoginPassword").val("");
 
+                $("#loginMessage").text("Please log in.");
+                $("#loginMessage").removeClass("error");
+
                 // get global user settings
                 if (globalUserSettings == null) {
                     $("#loginLoading").show();
                     $("#loginContent").hide();
                     socket.emit('getGlobalUserSettings', null);
+                } else {
+                    $("#loginLoading").hide();
+                    $("#loginContent").show();
+                }
+            };
+
+            var loginResponse = function (data) {
+                // set login message
+                if (data.status == "nouser") {
+                    $("#loginMessage").addClass("error");
+                    $("#loginMessage").text("There is no user by that username.");
+                } else if (data.status == "badpassword") {
+                    $("#loginMessage").addClass("error");
+                    $("#loginMessage").text("The password you provided is incorrect.");
+                }
+
+                if (data.status === "verifyemail") {
+                    // show verify email window
+                    $("#wndLogin").jqxWindow("hide");
+
+                    // showVerifyEmailWindow();
+                } else if (data.status === "success") {
+                    // we are logged in
+                    $("#wndLogin").jqxWindow("hide");
+
+                    loggedIn = true;
+                    username = data.username;
+
+                    $("#loginName").text(username);
+
+                    // reloadPage();
+                } else {
+                    $("#loginLoading").hide();
+                    $("#loginContent").show();
                 }
             };
         </script>
 
+        <!-- create an account window -->
+        <div id="wndCreateUser">
+            <div >Create an account</div>
+            <div class="centre">
+                <div id="createUserContent">
+                    <span id="createUserMessage"></span>
+                    <table class="centre">
+                        <tr><td>Username:</td><td><input type="text" id="tbCreateUserUsername" /></td></tr>
+                        <tr><td>Password:</td><td><input type="password" id="tbCreateUserPassword" /></td></tr>
+                        <tr><td>Confirm Password:</td><td><input type="password" id="tbCreateUserConfirmPassword" /></td></tr>
+                        <tr><td>Email Address:</td><td><input type="text" id="tbCreateUserEmail" /></td></tr>
+                    </table>
+                    <br />
+                        <input type="button" value="Register" id="btnCreateUserRegister" />
+                        <input type="button" value="Cancel" id="btnCreateUserCancel" />
+                </div>
+
+                <div class="loading" id="createUserLoading"></div>
+            </div>
+        </div>
+        <script type="text/javascript">
+            $(function () {
+                $("#wndCreateUser").jqxWindow({ width: '350px', height: '185px', autoOpen: false });
+
+                $("#tbCreateUserUsername").jqxInput().width("100%");
+                $("#tbCreateUserPassword").jqxInput().width("100%");
+                $("#tbCreateUserConfirmPassword").jqxInput().width("100%");
+                $("#tbCreateUserEmail").jqxInput().width("100%");
+                $("#btnCreateUserRegister").jqxButton();
+                $("#btnCreateUserRegister").click(function () {
+                    var username = $("#tbCreateUserUsername").val();
+                    var password = $("#tbCreateUserPassword").val();
+                    var email = $("#tbCreateUserEmail").val();
+
+                    // test passwords
+                    if (password !== $("#tbCreateUserConfirmPassword").val()) {
+                        $("#createUserMessage").addClass("error");
+                        $("#createUserMessage").text("Your passwords do not match.");
+                        return;
+                    }
+
+                    $("#createUserLoading").show();
+                    $("#createUserContent").hide();
+
+                    socket.emit('createUser', { username: username, password: password, email: email });
+
+                });
+                $("#btnCreateUserCancel").jqxButton();
+                $("#btnCreateUserCancel").click(function () {
+                    $("#wndCreateUser").jqxWindow("hide");
+                });
+            });
+
+            var showCreateUserWindow = function() {
+                $("#wndCreateUser").jqxWindow("show");
+                $("#tbCreateUserUsername").val("");
+                $("#tbCreateUserPassword").val("");
+                $("#tbCreateUserConfirmPassword").val("");
+                $("#tbCreateUserEmail").val("");
+
+                $("#createUserMessage").text("Enter your details to create a user account.");
+                $("#createUserMessage").removeClass("error");
+
+                $("#createUserLoading").hide();
+                $("#createUserContent").show();
+            };
+
+            var createUserResponse = function (data) {
+                // set login message
+                if (data.status == "userexists") {
+                    $("#createUserMessage").addClass("error");
+                    $("#createUserMessage").text("That username is already taken.");
+                } else if (data.status == "badusername") {
+                    $("#createUserMessage").addClass("error");
+                    $("#createUserMessage").text("That username cannot be used.");
+                } else if (data.status == "badpassword") {
+                    $("#createUserMessage").addClass("error");
+                    $("#createUserMessage").text(globalUserSettings.passwordRequirements);
+                } else if (data.status == "bademail") {
+                    $("#createUserMessage").addClass("error");
+                    $("#createUserMessage").text("Please provide a valid email address.");
+                }
+
+                if (data.status === "verifyemail") {
+                    // show verify email window
+                    $("#wndCreateUser").jqxWindow("hide");
+
+                    // showVerifyEmailWindow();
+                } else if (data.status === "success") {
+                    // we are logged in
+                    $("#wndCreateUser").jqxWindow("hide");
+                    // show success page
+                    showLoginWindow();
+                    $("#loginMessage").text("You have succesfully registered.");
+                } else {
+                    $("#createUserLoading").hide();
+                    $("#createUserContent").show();
+                }
+            };
+        </script>
+
+        <!-- global -->
         <script type="text/javascript">
             var socket = null; // socket object
             var globalSettings = null; // global wiki settings
             var globalUserSettings = null; // global user settings
 
             var loggedIn = false; // is the user logged in?
+            var username = ""; // name of the logged in user
 
 
             var resize = function () {
@@ -119,6 +274,10 @@
                 var newHeight = window.innerHeight - 145;
                 $(".mce-edit-area").height(newHeight);
                 $("#mce_0_ifr").height(newHeight);
+            };
+
+            var reloadPage = function () {
+                console.log("load page");
             };
 
             $(function () {
@@ -134,7 +293,7 @@
                         "emoticons template paste textcolor"
                     ],
                     toolbar: "insertfile undo redo | styleselect | bold italic | forecolor backcolor emoticons | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media",
-                    setup: function (ed) {
+                    setup: function (ed) {999999
                         ed.on('load', resize);
                     }
                 });*/
@@ -143,6 +302,7 @@
 
                 // socket stuff
                 socket = io.connect();
+                    
                 socket.on('globalSettings', function (data) {
                     globalSettings = data;
                     $("#WikiName").text(globalSettings.wikiName);
@@ -155,14 +315,15 @@
                     $("#loginLoading").hide();
                     $("#loginContent").show();
 
-                    console.log(globalUserSettings);
-
                     if (globalUserSettings.canRegister) {
                         $("#btnLoginCreateAnAccount").show();
                     } else {
                         $("#btnLoginCreateAnAccount").hide();
                     }
                 });
+
+                socket.on('loginResponse', loginResponse);
+                socket.on('createUserResponse', createUserResponse);
             });
         </script>
     </body>
