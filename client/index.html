@@ -5,6 +5,7 @@
         <script type="text/javascript" src="/client/jquery-1.11.0.min.js"></script>
         <script type="text/javascript" src="/client/tinymce/tinymce.min.js"></script>
         <script type="text/javascript" src="/client/jqwidgets/jqwidgets/jqx-all.js"></script>
+        <script type="text/javascript" src="/client/jquery.cookie.js"></script>
         <script src="/socket.io/socket.io.js"></script>
 
         <link rel="stylesheet" href="/client/jqwidgets/jqwidgets/styles/jqx.base.css" type="text/css" />
@@ -95,6 +96,10 @@
                     $("#loginLoading").show();
                     $("#loginContent").hide();
 
+                    // save username and password in a cookie so when the user reloads they don't have to log in again
+                    $.cookie('username', username);
+                    $.cookie('password', password);
+
                     socket.emit('login', { username: username, password: password });
 
                 });
@@ -143,6 +148,7 @@
                     $("#wndLogin").jqxWindow("hide");
 
                     showVerifyEmailWindow();
+                    clearCookies();
                 } else if (data.status === "success") {
                     // we are logged in
                     $("#wndLogin").jqxWindow("hide");
@@ -156,6 +162,7 @@
                 } else {
                     $("#loginLoading").hide();
                     $("#loginContent").show();
+                    clearCookies();
                 }
             };
         </script>
@@ -306,7 +313,6 @@
                     $("#verifyEmailMessage").text("Another email has been sent to your email address.");
                     $("#verifyEmailMessage").removeClass("error");
                 });
-
             });
 
             var showVerifyEmailWindow = function () {
@@ -403,6 +409,13 @@
                 loggedIn = false;
                 username = "";
                 $("#loginName").text("Log in");
+                // forget that we were logged in, so we don't log back in when the user reloads the page
+                clearCookies();
+            };
+
+            var clearCookies = function () {
+                $.removeCookie('username');
+                $.removeCookie('password');
             };
 
             $(function () {
@@ -451,6 +464,14 @@
                 socket.on('loginResponse', loginResponse);
                 socket.on('createUserResponse', createUserResponse);
                 socket.on('verifyEmailResponse', verifyEmailResponse);
+
+                // see if we have our username and password stored in a cookie
+                var usrn = $.cookie('username');
+                var paswd = $.cookie('password');
+
+                if (usrn !== undefined && paswd !== undefined) {
+                    socket.emit('login', { username: usrn, password: paswd });
+                }
             });
         </script>
     </body>
