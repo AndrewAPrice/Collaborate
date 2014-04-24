@@ -107,6 +107,29 @@ io.sockets.on('connection', function(socket) {
         });
     });
 
+    // user requests to resend their verification email
+    socket.on('resendVerificationEmail', function(data) {
+        // check params were passed in
+        if(typeof data !== 'object' || data.username === undefined || socket.loggedIn == true) {
+            return;
+        }
+
+        Users.resendVerificationEmail(data.username);
+    });
+
+    // user tries to verify their email address
+    socket.on('verifyEmail', function(data) {
+        // check params were passed in
+        if(typeof data !== 'object' || data.username === undefined || data.token === undefined || socket.loggedIn == true) {
+            socket.emit("verifyEmailResponse", { status: "badcode" });
+            return;
+        }
+
+        Users.verifyEmail(data.username, data.token, function(response) {
+            socket.emit("verifyEmailResponse", response);
+        });
+    });
+
     // log the user out
     var logout = function() {
         // not logged in?

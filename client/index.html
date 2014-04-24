@@ -87,7 +87,7 @@
                 $("#tbLoginPassword").jqxInput().width("100%");
                 $("#btnLoginLogin").jqxButton();
                 $("#btnLoginLogin").click(function () {
-                    var username = $("#tbLoginUsername").val();
+                    username = $("#tbLoginUsername").val();
                     var password = $("#tbLoginPassword").val();
 
                     $("#loginLoading").show();
@@ -140,7 +140,7 @@
                     // show verify email window
                     $("#wndLogin").jqxWindow("hide");
 
-                    // showVerifyEmailWindow();
+                    showVerifyEmailWindow();
                 } else if (data.status === "success") {
                     // we are logged in
                     $("#wndLogin").jqxWindow("hide");
@@ -188,7 +188,7 @@
                 $("#tbCreateUserEmail").jqxInput().width("100%");
                 $("#btnCreateUserRegister").jqxButton();
                 $("#btnCreateUserRegister").click(function () {
-                    var username = $("#tbCreateUserUsername").val();
+                    username = $("#tbCreateUserUsername").val();
                     var password = $("#tbCreateUserPassword").val();
                     var email = $("#tbCreateUserEmail").val();
 
@@ -244,17 +244,96 @@
                 if (data.status === "verifyemail") {
                     // show verify email window
                     $("#wndCreateUser").jqxWindow("hide");
-
-                    // showVerifyEmailWindow();
+                    showVerifyEmailWindow();
                 } else if (data.status === "success") {
-                    // we are logged in
                     $("#wndCreateUser").jqxWindow("hide");
-                    // show success page
+                    // ask user to log in
                     showLoginWindow();
                     $("#loginMessage").text("You have succesfully registered.");
                 } else {
                     $("#createUserLoading").hide();
                     $("#createUserContent").show();
+                }
+            };
+        </script>
+
+        <!-- verify email address window -->
+        <div id="wndVerifyEmail">
+            <div >Verify your email address</div>
+            <div class="centre">
+                <div id="verifyEmailContent">
+                    <span id="verifyEmailMessage"></span>
+                    <table class="centre">
+                        <tr><td>Code:</td><td><input type="text" id="tbVerifyEmailCode" /></td></tr>
+                    </table>
+                    <br />
+                        <input type="button" value="Verify" id="btnVerifyEmailVerify" />
+                        <input type="button" value="Cancel" id="btnVerifyEmailCancel" />
+                        <input type="button" value="Resend" id="btnVerifyEmailResend" />
+                </div>
+
+                <div class="loading" id="verifyEmailLoading"></div>
+            </div>
+        </div>
+        
+        <script type="text/javascript">
+            $(function () {
+                $("#wndVerifyEmail").jqxWindow({ width: '360px', height: '120px', autoOpen: false });
+
+                $("#tbVerifyEmailCode").jqxInput().width("100%");
+                $("#btnVerifyEmailVerify").click(function () {
+                    var code = $("#tbVerifyEmailCode").val();
+
+                    $("#verifyEmailLoading").show();
+                    $("#verifyEmailContent").hide();
+
+                    socket.emit('verifyEmail', { username: username, token: code});
+
+                });
+                $("#btnVerifyEmailCancel").jqxButton();
+                $("#btnVerifyEmailCancel").click(function () {
+                    $("#wndVerifyEmail").jqxWindow("hide");
+                });
+                $("#btnVerifyEmailResend").jqxButton();
+                $("#btnVerifyEmailResend").click(function () {
+                    $("#btnVerifyEmailResend").jqxButton({ disabled: true });
+
+
+                    socket.emit('resendVerificationEmail', { username: username });
+
+                    $("#verifyEmailMessage").text("Another email has been sent to your email address.");
+                    $("#verifyEmailMessage").removeClass("error");
+                });
+
+            });
+
+            var showVerifyEmailWindow = function () {
+                $("#wndVerifyEmail").jqxWindow("show");
+                $("#tbVerifyEmailCode").val("");
+
+                $("#verifyEmailMessage").text("Please enter the code that was emailed to you.");
+                $("#verifyEmailMessage").removeClass("error");
+
+                $("#verifyEmailLoading").hide();
+                $("#verifyEmailContent").show();
+                $("#btnVerifyEmailResend").jqxButton({ disabled: false });
+            };
+
+            var verifyEmailResponse = function (data) {
+                // set login message
+                if (data.status === "badcode") {
+                    $("#verifyEmailMessage").addClass("error");
+                    $("#verifyEmailMessage").text("The code you provided is not correct.");
+                }
+
+                if (data.status === "success") {
+                    // we are logged in
+                    $("#wndVerifyEmail").jqxWindow("hide");
+                    showLoginWindow();
+                    $("#loginMessage").text("You have verified your email address.");
+                } else {
+                    $("#verifyEmailLoading").hide();
+                    $("#verifyEmailContent").show();
                 }
             };
         </script>
@@ -324,6 +403,7 @@
 
                 socket.on('loginResponse', loginResponse);
                 socket.on('createUserResponse', createUserResponse);
+                socket.on('verifyEmailResponse', verifyEmailResponse);
             });
         </script>
     </body>

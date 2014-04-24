@@ -28,7 +28,7 @@ exports.globalSettings = {
     // password requirements to display to the user
     passwordRequirements:  "Passwords must be at least 6 characters long.",
     // do we need to verify the user's email address?
-    verifyEmail: false
+    verifyEmail: true
 };
 
 // users.object contains all users the lowercase username is the key
@@ -73,10 +73,10 @@ var sendVerificationEmail = function(username, email, token) {
 
 // authenticates a user, returns the user object if the credentials are valid, null otherwise
 exports.authenticate = function(username, password, callback) {
-    // conver the username to lower case and trim it, so we can use it as a key
+    // convert the username to lower case and trim it, so we can use it as a key
     var id = username.toLowerCase().trim();
 
-    // check if the user exists
+    // check if the username is valid
     if(id.length === 0) {
         callback({ status: "nouser" });
         return;
@@ -164,7 +164,7 @@ exports.createUser = function(username, password, email, callback) {
                     return;
                 }
             
-                if(exports.globalSettings.confirmEmail == true) {
+                if(exports.globalSettings.verifyEmail == true) {
                     sendVerificationEmail(username, email, token);
                     callback({ status: "verifyemail" }); // send a verification email
                 } else
@@ -177,6 +177,69 @@ exports.createUser = function(username, password, email, callback) {
 // deletes a user
 // must either be ourself, or an administrator
 exports.deleteUser = function(username, callerid, callback) {
+};
+
+exports.resendVerificationEmail = function(username) {
+    var id = username.toLowerCase().trim();
+
+    // check if the username is valid
+    if(id.length === 0) {
+        return;
+    }
+
+    // fetch user
+    usersDb.find({id: id}, function(err, docs) {
+        // the user does not exist
+        if(docs.length == 0) {
+            return;
+        }
+
+        var user = docs[0];
+        if(user.verify !== null && exports.globalSettings.verifyEmail) {
+            // they need to verify their email address
+            sendVerificationEmail(user.username, user.email, user.verify);
+        };
+    });
+};
+
+exports.verifyEmail = function(username, token, callback) {
+    var id = username.toLowerCase().trim();
+
+    // check if the username is valid
+    if(id.length === 0) {
+        callback({ status: "badcode" });
+        return;
+    }
+
+    // fetch user
+    usersDb.find({id: id}, function(err, docs) {
+        // the user does not exist
+        if(docs.length == 0) {
+            callback({ status: "badcode" });
+            return;
+        }
+
+        var user = docs[0];
+        if(user.verify !== null && exports.globalSettings.verifyEmail) {
+            // they need to verify their email address
+            // sendVerificationEmail(user.username, user.email, user.verify);
+            if(user.verify !== token)
+                callback({ status: "badcode" });
+            else {
+                usersDb.update({id: id}, {$set: {verify: null}}, function(err) {
+                    if(err)
+                        callback({ status: "badcode" });
+                    else
+                        // the user validated their code
+                        callback({ status: "success" });
+                });
+            }
+        } else {
+            // the user does not need to verify their email address
+            callback({ status: "badcode" });
+        }
+    });
+
 };
 
 // gets a user object - returns null if the user doesn't exist
