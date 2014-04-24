@@ -16,13 +16,28 @@
     text-align: right;
 }
 
+#userDropDown {
+    position: absolute;
+    top: 20px;
+    background-color: #D1D1D1;
+}
+
+#userDropDown a:active, #userDropDown a:visited, #userDropDown a {
+    color: black;
+}
+
+#userDropDown a:hover {
+    color: black;
+    background-color: #a3a3a3;
+}
+
 .centre {
     text-align: center;
     margin-left:auto; 
     margin-right:auto;
 }
 
-.highlightButton:active, .highlightButton:visited, .highlightButton:active .highlightButton a {
+.highlightButton:active, .highlightButton:visited, .highlightButton a {
     color: black;
 }
 

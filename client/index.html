@@ -30,6 +30,8 @@
                         $("#loginName").click(function () {
                             if(!loggedIn)
                                 showLoginWindow();
+                            else
+                                toggleUserDropDown();
                         });
                     });
                 </script>
@@ -338,6 +340,39 @@
             };
         </script>
 
+        <!-- user drop down -->
+        <div id="userDropDown">
+            <a href="#" id="btnUserDropDownSettings" >Settings</a><br />
+            <a href="#" id="btnUserDropDownMessages" >Messages</a><br />
+            <a href="#" id="btnUserDropDownLogOut" >Log out</a>
+        </div>
+        <script type="text/javascript">
+            $(function () {
+                $("#userDropDown").hide();
+                $("#btnUserDropDownLogOut").click(function () {
+                    hideUserDropDown();
+                    logout();
+                });
+            });
+
+            var showingUserDropDown = false;
+
+            var toggleUserDropDown = function() {
+                if(showingUserDropDown) {
+                    $("#userDropDown").hide();
+                    showingUserDropDown = false;
+                } else {
+                    $("#userDropDown").show();
+                    showingUserDropDown = true;
+                }
+            };
+
+            var hideUserDropDown = function() {
+                $("#userDropDown").hide();
+                showingUserDropDown = false;
+            };
+        </script>
+
         <!-- global -->
         <script type="text/javascript">
             var socket = null; // socket object
@@ -349,14 +384,25 @@
 
 
             var resize = function () {
+                var windowHeight = window.innerHeight;
+                var windowWidth = window.innerWidth; 
                 // resize TinyMCE to take up the window
-                var newHeight = window.innerHeight - 145;
+                var newHeight = windowHeight - 145;
                 $(".mce-edit-area").height(newHeight);
                 $("#mce_0_ifr").height(newHeight);
+
+                $("#userDropDown").css("left", windowWidth - $("#userDropDown").width());
             };
 
             var reloadPage = function () {
                 console.log("load page");
+            };
+
+            var logout = function() {
+                socket.emit("logout", null);
+                loggedIn = false;
+                username = "";
+                $("#loginName").text("Log in");
             };
 
             $(function () {
@@ -377,6 +423,7 @@
                     }
                 });*/
                 
+                resize();
                 $(window).resize(resize);
 
                 // socket stuff
