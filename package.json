@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "express": "~4.0.0",
-    "socket.io": "~0.9.16"
+    "socket.io": "~0.9.16",
+    "mongodb": "~1.4.2",
+    "monk": "~0.8.1",
+    "bcrypt-nodejs": "0.0.3",
+    "nodemailer": "~0.6.3"
   }
 }
