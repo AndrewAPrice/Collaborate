@@ -10,8 +10,8 @@ You can also call .saveNow() to save the object to disk immediately.
 ******************************************************************************/
 var fs = require('fs');
 
-// Timeout to save: (seconds)
-var saveTimer = 60;
+// Timeout to save: (milliseconds)
+var saveTimer = 5 * 60 * 1000;
 
 // Array of opened storage objects - we save this so on quit when we flush everything, we
 // have a list of all open objects.
@@ -89,5 +89,5 @@ exports.load = function(path) {
 exports.flush = function() {
     // loop through all of our storages
     for(var i = 0; i < openedStorages.length; i++)
-        openStorages[i].saveNow(); // force to save it
+        openedStorages[i].saveNow(); // force to save it
 };
