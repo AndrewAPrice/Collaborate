@@ -25,6 +25,9 @@ To run, make sure you have Node.js installed and call:
 
 node app.js
 
+## Current features
+- Registration and optional e-mail verification for users.
+
 ## Planned features
 - Intuitive WYSIWYG editing of pages.
 - Group and user-based permissions.
