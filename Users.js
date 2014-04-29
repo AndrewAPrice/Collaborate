@@ -7,15 +7,17 @@ authentication.
 
 ******************************************************************************/
 // storage for the users
-var db = require('./Storage.js').db;
+// var db = require('./Storage.js').db;
 var bcrypt = require('bcrypt-nodejs');
 var crypto = require('crypto');
 var mail = require('nodemailer').mail;
 
 var Server = require('./Server.js');
 
-var usersDb = db.get('users');
-usersDb.index('id', { unique: true});
+// var usersDb = db.get('users');
+// usersDb.index('id', { unique: true});
+
+var users = require('./JSONStorage.js').load('./storage/users.json');
 
 // the salt used for encrypting passwords - changing this will break users' passwords!
 // if you're using this in a production environment you may generate a unique salt
@@ -83,30 +85,27 @@ exports.authenticate = function(username, password, callback) {
     }
 
     // fetch user
-    usersDb.find({id: id}, function(err, docs) {
-        // the user does not exist
-        if(docs.length == 0) {
-            callback({ status: "nouser" });
+    var user = users.object[id];
+    if(user === undefined) {
+        callback({ status: "nouser" });
+        return;    
+    }
+
+    if(user.verify !== null && exports.globalSettings.verifyEmail) {
+        // they need to verify their email address
+        callback({ status: "verifyemail" });
+        return;
+    };
+
+    // compare the password
+    bcrypt.compare(password, user.password, function(error, result) {
+        if(error || !result) {
+            callback({status: "badpassword"});
             return;
         }
 
-        var user = docs[0];
-        if(user.verify !== null && exports.globalSettings.verifyEmail) {
-            // they need to verify their email address
-            callback({ status: "verifyemail" });
-            return;
-        };
-
-        // compare the password
-        bcrypt.compare(password, user.password, function(error, result) {
-            if(error || !result) {
-                callback({status: "badpassword"});
-                return;
-            }
-
-            // all is good
-            callback({status: "success", id: id, username: user.username, uiMessages: user.uiMessages});
-        });
+        // all is good
+        callback({status: "success", id: id, username: user.username, uiMessages: user.uiMessages});
     });
 };
 
@@ -119,7 +118,7 @@ exports.createUser = function(username, password, email, callback) {
     }
 
     // test the username
-    var id =  username.toLowerCase().trim();
+    var id = username.toLowerCase().trim();
     if(id.length == 0) {
         callback({ status: "badusername" });
         return;
@@ -149,27 +148,28 @@ exports.createUser = function(username, password, email, callback) {
 
         // generate a random email verification token
         generateEmailVerificationCode(function(token) {
-            // try to create us
-            usersDb.insert({
+            // callbacks are done, check if the user already exists
+            if(users.object[id] !== undefined) {
+                callback({status: "userexists"});
+                return;
+            }
+
+            // insert us
+            users.object[id] = {
                 id: id,
                 username: username,
                 password: password,
                 email: email,
                 verify: token,
                 uiMessages: {}
-            }, function(err, doc) {
-                // the user already exists if an error is thrown
-                if(err) {
-                    callback({status: "userexists"});
-                    return;
-                }
+            };
+            users.invalidate();
             
-                if(exports.globalSettings.verifyEmail == true) {
-                    sendVerificationEmail(username, email, token);
-                    callback({ status: "verifyemail" }); // send a verification email
-                } else
-                    callback({ status: "success" }); // user is created!
-            });
+            if(exports.globalSettings.verifyEmail == true) {
+                sendVerificationEmail(username, email, token);
+                callback({ status: "verifyemail" }); // send a verification email
+            } else
+                callback({ status: "success" }); // user is created!
         });
     });
 };
@@ -188,18 +188,15 @@ exports.resendVerificationEmail = function(username) {
     }
 
     // fetch user
-    usersDb.find({id: id}, function(err, docs) {
-        // the user does not exist
-        if(docs.length == 0) {
-            return;
-        }
+    var user = users.object[id];
+    // the user does not exist
+    if(user === undefined)
+        return;
 
-        var user = docs[0];
-        if(user.verify !== null && exports.globalSettings.verifyEmail) {
-            // they need to verify their email address
-            sendVerificationEmail(user.username, user.email, user.verify);
-        };
-    });
+    if(user.verify !== null && exports.globalSettings.verifyEmail) {
+        // they need to verify their email address
+        sendVerificationEmail(user.username, user.email, user.verify);
+    };
 };
 
 exports.verifyEmail = function(username, token, callback) {
@@ -212,34 +209,30 @@ exports.verifyEmail = function(username, token, callback) {
     }
 
     // fetch user
-    usersDb.find({id: id}, function(err, docs) {
-        // the user does not exist
-        if(docs.length == 0) {
+    var user = users.object[id];
+    // the user does not exist
+    if(user === undefined) {
+        callback({ status: "badcode" });
+        return;
+    }
+    
+    if(user.verify !== null && exports.globalSettings.verifyEmail) {
+        // they need to verify their email address
+        // sendVerificationEmail(user.username, user.email, user.verify);
+        if(user.verify !== token)
             callback({ status: "badcode" });
-            return;
+        else {
+            // verified
+            user.verify = null;
+            users.invalidate();
+            
+            // the user validated their code
+            callback({ status: "success" });
         }
-
-        var user = docs[0];
-        if(user.verify !== null && exports.globalSettings.verifyEmail) {
-            // they need to verify their email address
-            // sendVerificationEmail(user.username, user.email, user.verify);
-            if(user.verify !== token)
-                callback({ status: "badcode" });
-            else {
-                usersDb.update({id: id}, {$set: {verify: null}}, function(err) {
-                    if(err)
-                        callback({ status: "badcode" });
-                    else
-                        // the user validated their code
-                        callback({ status: "success" });
-                });
-            }
-        } else {
-            // the user does not need to verify their email address
-            callback({ status: "badcode" });
-        }
-    });
-
+    } else {
+        // the user does not need to verify their email address
+        callback({ status: "badcode" });
+    }
 };
 
 // gets a user object - returns null if the user doesn't exist
