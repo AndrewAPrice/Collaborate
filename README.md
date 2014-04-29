@@ -5,14 +5,12 @@ Collaborate is a Wiki server that intends to be intuitive and easy to use.
 ## Directory Structure
 - / - Node.js code
 - /client - client-side code that runs in the web browser
-- /storage - where MongoDB stores its data
+- /storage - where the data is stored
 
 ## Requirements
 You need Node.js installed, and install the following dependencies via npm:
 - express
 - socket.io
-- mongodb
-- monk
 - bcrypt-nodejs
 - nodemailer
 
