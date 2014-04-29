@@ -112,4 +112,70 @@ exports.loadPage = function(userid, path, redirect, callback) {
 };
 
 exports.createPage = function(userid, path, callback) {
+    if(userid === undefined || path === undefined || callback === undefined)
+        return
+
+    var pagename; // the name of the page
+    var parent = null; // the parent page
+
+    // see if this is a child page
+    var divider = path.lastIndexOf('/');
+
+    
+    if(divider != -1) {
+        pagename = path.substring(divider + 1).trim();
+
+        // this is a child page, look up the parent
+        var result = getPage(userid, path);
+        if(result.status !== "success") {
+            // does not exist
+            if(result.status === "noparent") {
+                callback({status: "noparent"});
+                return;
+            }
+
+            // some other error
+            callback({status: "nopermission"});
+            return;
+        }
+    } else {
+        pagename = path.trim();
+    }
+
+    // check that the name of the page is valid
+    if(pagename.length === 0) {
+        callback({status: "nopermission"});
+        return;
+    }
+
+    var collection; // the collection we want to add the page to
+    if(parent !== null)
+        collection = parent.children;
+    else
+        collection = pages.object;
+
+    // check if the page already exists
+    if(collection[pagename] !== undefined) {
+        callback({status: "alreadyexists"});
+        return;
+    }
+
+    // create this page
+    var newPage = {
+        contents: {
+            userid: userid,
+            date: (new Date()).toUTCString(),
+            contents: ""
+            },
+        readUsers: {},
+        writeUsers: {},
+        children: {}
+    };
+
+    collection[pagename] = newPage;
+
+    // invalidate the storage structure so it eventually flushes to disk
+    pages.invalidate();
+
+    callback({status: "success"});
 };
