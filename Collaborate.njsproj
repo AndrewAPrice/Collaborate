@@ -35,7 +35,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="app.js" />
+    <Compile Include="Database.js" />
     <Compile Include="JSONStorage.js" />
+    <Compile Include="Settings.js" />
     <Compile Include="Storage.js" />
     <Compile Include="Server.js" />
     <Content Include="client\index.html" />
