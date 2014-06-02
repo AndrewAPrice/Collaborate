@@ -16,6 +16,11 @@
     text-align: right;
 }
 
+#menubar {
+    background-color: #E1E1E1;
+    text-align: center;
+}
+
 #userDropDown {
     position: absolute;
     top: 20px;
@@ -67,4 +72,59 @@ body {
 
 .error {
     color: red;
+}
+
+.panel {
+    border: 1px solid;
+    border-radius: 3px;
+    line-height: 1.231;
+    font-family: Verdana,Arial,sans-serif;
+    font-style: normal;
+    font-size: 13px;
+    -webkit-text-size-adjust: none;
+    background-clip: padding-box;
+    -webkit-background-clip: padding-box;
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+    font-family: Verdana,Arial,sans-serif;
+    font-style: normal;
+    font-size: 13px;
+    border-color: #c7c7c7;
+    background: #fff;
+    -moz-border-radius-topleft: 3px;
+    -webkit-border-top-left-radius: 3px;
+    border-top-left-radius: 3px;
+    -moz-border-radius-topright: 3px;
+    -webkit-border-top-right-radius: 3px;
+    border-top-right-radius: 3px;
+    margin-bottom: 10px;
+}
+
+.panel-header {
+    border-color: #c5c5c5;
+    background: #e8e8e8;
+    outline: none;
+    border-width: 0px;
+    border-bottom: 1px solid transparent;
+    padding: 5px;
+    height: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    -moz-border-radius-topleft: 3px;
+    -webkit-border-top-left-radius: 3px;
+    border-top-left-radius: 3px;
+    -moz-border-radius-topright: 3px;
+    -webkit-border-top-right-radius: 3px;
+    border-top-right-radius: 3px;
+}
+
+.panel-body {
+    border-color: #c7c7c7;
+    background: #fff;
+    -moz-border-radius-bottomleft: 3px;
+    -webkit-border-bottom-left-radius: 3px;
+    border-bottom-left-radius: 3px;
+    -moz-border-radius-bottomright: 3px;
+    -webkit-border-bottom-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    padding: 5px;
 }

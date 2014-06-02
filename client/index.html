@@ -6,6 +6,7 @@
         <script type="text/javascript" src="/client/tinymce/tinymce.min.js"></script>
         <script type="text/javascript" src="/client/jqwidgets/jqwidgets/jqx-all.js"></script>
         <script type="text/javascript" src="/client/jquery.cookie.js"></script>
+        <script type="text/javascript" src="/client/jquery.ba-hashchange.min.js"></script>
         <script src="/socket.io/socket.io.js"></script>
 
         <link rel="stylesheet" href="/client/jqwidgets/jqwidgets/styles/jqx.base.css" type="text/css" />
@@ -13,14 +14,13 @@
     </head>
     <body>
         <div id="titlebar">
-            <span id="WikiName">&nbsp;</span>
+            <span id="CommunityName">&nbsp;</span>
 
             <div id="titlebar-left">
                 [Search] <a href="#" class="highlightButton">(Search)</a>
                 <a href="#" class="highlightButton">(Info)</a>
                 <a href="#" class="highlightButton">(Share)</a>
                 <a href="#" class="highlightButton">(Print)</a>
-
             </div>
 
             <div id="titlebar-right">
@@ -33,6 +33,8 @@
                                 showLoginWindow();
                             else
                                 toggleUserDropDown();
+
+                            return false;
                         });
                     });
                 </script>
@@ -53,14 +55,23 @@
                 };
             </script>
         </div>
-        <div class="editable"">
+
+        <div id="menubar">
+            <a href="#blogs" class="highlightButton" id="btnMenuBlogs">Blogs</a>
+            <a href="#courses" class="highlightButton" id="btnMenuCourses">Courses</a>
+            <a href="#discussions" class="highlightButton" id="btnMenuDiscussions">Discussions</a>
+            <a href="#events" class="highlightButton" id="btnMenuEvents">Events</a>
+            <a href="#wiki" class="highlightButton" id="btnMenuWiki">Wiki</a>
+        </div>
+        
+        <!--<div class="editable"">
                      <p>This is an editable div container.</p>
                      <p>Follow us on <a href="http://twitter.com/alohaeditor">Twitter</a>.</p>
                      <ul>
                             <li>list item one</li>
                             <li>list item two</li>
                      </ul>
-        </div>
+        </div> -->
 
         <!-- windows -->
         <!-- login window -->
@@ -77,6 +88,7 @@
                         <input type="button" value="Log in" id="btnLoginLogin" />
                         <input type="button" value="Cancel" id="btnLoginCancel" />
                         <input type="button" value="Create an account" id="btnLoginCreateAnAccount" />
+                        <input type="button" value="Forgot Password" id="btnForgotPassword" />
                 </div>
 
                 <div class="loading" id="loginLoading"></div>
@@ -84,7 +96,7 @@
         </div>
         <script type="text/javascript">
             $(function () {
-                $("#wndLogin").jqxWindow({ width: '300px', height: '140px', autoOpen: false });
+                $("#wndLogin").jqxWindow({ width: '395px', height: '160px', autoOpen: false });
 
                 $("#tbLoginUsername").jqxInput().width("100%");
                 $("#tbLoginPassword").jqxInput().width("100%");
@@ -111,6 +123,25 @@
                 $("#btnLoginCreateAnAccount").click(function () {
                     $("#wndLogin").jqxWindow("hide");
                     showCreateUserWindow();
+                });
+
+                $("#btnForgotPassword").jqxButton();
+                $("#btnForgotPassword").click(function () {
+                    username = $("#tbLoginUsername").val().trim();
+                    if (username.length == 0) {
+                        $("#loginMessage").addClass("error");
+                        $("#loginMessage").text("Please enter a valid username.");
+                        return;
+                    }
+
+
+                    // show verify email window
+                    $("#wndLogin").jqxWindow("hide");
+                    socket.emit('resendVerificationEmail', { username: username });
+
+                    showVerifyEmailWindow();
+
+                    $("#btnVerifyEmailResend").jqxButton({ disabled: true });
                 });
             });
 
@@ -154,11 +185,15 @@
                     $("#wndLogin").jqxWindow("hide");
 
                     loggedIn = true;
-                    username = data.username;
+                    userid = data.userid;
+                    realname = data.realname;
 
-                    $("#loginName").text(username);
+                    $("#loginName").text(realname);
 
                     // reloadPage();
+
+                    if (globalSettings.publicAccess == false)
+                        $(window).hashchange();
                 } else {
                     $("#loginLoading").hide();
                     $("#loginContent").show();
@@ -175,8 +210,7 @@
                     <span id="createUserMessage"></span>
                     <table class="centre">
                         <tr><td>Username:</td><td><input type="text" id="tbCreateUserUsername" /></td></tr>
-                        <tr><td>Password:</td><td><input type="password" id="tbCreateUserPassword" /></td></tr>
-                        <tr><td>Confirm Password:</td><td><input type="password" id="tbCreateUserConfirmPassword" /></td></tr>
+                        <tr><td>Real Name:</td><td><input type="text" id="tbCreateUserRealname" /></td></tr>
                         <tr><td>Email Address:</td><td><input type="text" id="tbCreateUserEmail" /></td></tr>
                     </table>
                     <br />
@@ -188,30 +222,38 @@
             </div>
         </div>
         <script type="text/javascript">
+            
             $(function () {
                 $("#wndCreateUser").jqxWindow({ width: '350px', height: '185px', autoOpen: false });
 
                 $("#tbCreateUserUsername").jqxInput().width("100%");
-                $("#tbCreateUserPassword").jqxInput().width("100%");
-                $("#tbCreateUserConfirmPassword").jqxInput().width("100%");
+                $("#tbCreateUserRealname").jqxInput().width("100%");
                 $("#tbCreateUserEmail").jqxInput().width("100%");
                 $("#btnCreateUserRegister").jqxButton();
                 $("#btnCreateUserRegister").click(function () {
-                    username = $("#tbCreateUserUsername").val();
-                    var password = $("#tbCreateUserPassword").val();
-                    var email = $("#tbCreateUserEmail").val();
+                    var username = $("#tbCreateUserUsername").val().trim();
+                    var realname = $("#tbCreateUserRealname").val().trim();
+                    var email = $("#tbCreateUserEmail").val().trim();
 
                     // test passwords
-                    if (password !== $("#tbCreateUserConfirmPassword").val()) {
+                    if (username.length == 0) {
                         $("#createUserMessage").addClass("error");
-                        $("#createUserMessage").text("Your passwords do not match.");
+                        $("#createUserMessage").text("Your username cannot be blank.");
+                        return;
+                    } else if (realname.length == 0) {
+                        $("#createUserMessage").addClass("error");
+                        $("#createUserMessage").text("Your realname cannot be blank.");
+                        return;
+                    } else if (email.length == 0 || email.indexOf("@") == -1) {
+                        $("#createUserMessage").addClass("error");
+                        $("#createUserMessage").text("Your email address must be valid.");
                         return;
                     }
 
                     $("#createUserLoading").show();
                     $("#createUserContent").hide();
 
-                    socket.emit('createUser', { username: username, password: password, email: email });
+                    socket.emit('createUser', { username: username, realname: realname, email: email });
 
                 });
                 $("#btnCreateUserCancel").jqxButton();
@@ -242,9 +284,9 @@
                 } else if (data.status == "badusername") {
                     $("#createUserMessage").addClass("error");
                     $("#createUserMessage").text("That username cannot be used.");
-                } else if (data.status == "badpassword") {
+                } else if (data.status == "badrealname") {
                     $("#createUserMessage").addClass("error");
-                    $("#createUserMessage").text(globalUserSettings.passwordRequirements);
+                    $("#createUserMessage").text("Your real name is invalid.");
                 } else if (data.status == "bademail") {
                     $("#createUserMessage").addClass("error");
                     $("#createUserMessage").text("Please provide a valid email address.");
@@ -254,11 +296,6 @@
                     // show verify email window
                     $("#wndCreateUser").jqxWindow("hide");
                     showVerifyEmailWindow();
-                } else if (data.status === "success") {
-                    $("#wndCreateUser").jqxWindow("hide");
-                    // ask user to log in
-                    showLoginWindow();
-                    $("#loginMessage").text("You have succesfully registered.");
                 } else {
                     $("#createUserLoading").hide();
                     $("#createUserContent").show();
@@ -290,6 +327,7 @@
                 $("#wndVerifyEmail").jqxWindow({ width: '360px', height: '120px', autoOpen: false });
 
                 $("#tbVerifyEmailCode").jqxInput().width("100%");
+                $("#btnVerifyEmailVerify").jqxButton();
                 $("#btnVerifyEmailVerify").click(function () {
                     var code = $("#tbVerifyEmailCode").val();
 
@@ -338,7 +376,7 @@
                     // we are logged in
                     $("#wndVerifyEmail").jqxWindow("hide");
                     showLoginWindow();
-                    $("#loginMessage").text("You have verified your email address.");
+                    $("#loginMessage").text("You have verified your email address. Your temporary password is: " + data.password);
                 } else {
                     $("#verifyEmailLoading").hide();
                     $("#verifyEmailContent").show();
@@ -358,6 +396,7 @@
                 $("#btnUserDropDownLogOut").click(function () {
                     hideUserDropDown();
                     logout();
+                    return false;
                 });
             });
 
@@ -379,16 +418,56 @@
             };
         </script>
 
+        <!-- main body, home page -->
+        <div id="divHomePage" style="display:none;">
+            <table width="100%"><tr><td width="30%" valign="top">
+                <!-- left column -->
+
+                <div class="panel">
+                    <div class="panel-header">Discussion Threads</div>
+                    <div class="panel-body"></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">Recent Blog Posts</div>
+                    <div class="panel-body"></div>
+                </div>
+            </td><td width="40%" valign="top">
+                <!-- middle column -->
+                
+                <!-- welcome message -->
+                <div class="panel">
+                    <div class="panel-header">Welcome</div>
+                    <div class="panel-body" id="WelcomeMessage">
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">Recent Activity</div>
+                    <div class="panel-body"></div>
+                </div>
+            </td><td width="30%" valign="top">
+                <!-- right column -->
+                <div class="panel">
+                    <div class="panel-header">Recent Wiki Activity</div>
+                    <div class="panel-body"></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">Upcoming Events</div>
+                    <div class="panel-body"></div>
+                </div>
+            </td></tr></table>
+        </div>
+
         <!-- global -->
         <script type="text/javascript">
             var socket = null; // socket object
-            var globalSettings = null; // global wiki settings
-            var globalUserSettings = null; // global user settings
+            var globalSettings = {}; // global site settings
+            var globalUserSettings = {}; // global user settings
 
             var loggedIn = false; // is the user logged in?
-            var username = ""; // name of the logged in user
-
-
+            var userid = null; // id of the logged in user
+            var username = ""; // username, used when registering, verifying email, etc
+            var realname = ""; // realname of the logged in user
+            
             var resize = function () {
                 var windowHeight = window.innerHeight;
                 var windowWidth = window.innerWidth; 
@@ -411,6 +490,9 @@
                 $("#loginName").text("Log in");
                 // forget that we were logged in, so we don't log back in when the user reloads the page
                 clearCookies();
+
+                if (globalSettings.publicAccess == false)
+                    $(window).hashchange();
             };
 
             var clearCookies = function () {
@@ -444,7 +526,19 @@
                     
                 socket.on('globalSettings', function (data) {
                     globalSettings = data;
-                    $("#WikiName").text(globalSettings.wikiName);
+                    $("#CommunityName").text(globalSettings.communityName);
+                    $("#WelcomeMessage").text(globalSettings.welcomeMessage);
+
+                    // see if we have our username and password stored in a cookie
+                    var usrn = $.cookie('username');
+                    var paswd = $.cookie('password');
+
+                    if (usrn !== undefined && paswd !== undefined) {
+                        socket.emit('login', { username: usrn, password: paswd });
+                    }
+
+                    if (globalSettings.publicAccess)
+                        $(window).hashchange();
                 });
 
                 socket.on('globalUserSettings', function (data) {
@@ -465,14 +559,22 @@
                 socket.on('createUserResponse', createUserResponse);
                 socket.on('verifyEmailResponse', verifyEmailResponse);
 
-                // see if we have our username and password stored in a cookie
-                var usrn = $.cookie('username');
-                var paswd = $.cookie('password');
-
-                if (usrn !== undefined && paswd !== undefined) {
-                    socket.emit('login', { username: usrn, password: paswd });
-                }
+                $(window).hashchange(hashchange);
             });
+
+            var page = "";
+
+            var loadPage = function (page, noredirect) {
+            };
+
+            // reload the current page
+            var reloadPage = function () {
+            };
+
+            var hashchange = function () {
+                if (location.hash === '#')
+                    alert("Hash is '#' - forgot to handle!");
+            };
         </script>
     </body>
 </html>
