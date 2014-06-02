@@ -14,7 +14,7 @@
     </head>
     <body>
         <div id="titlebar">
-            <span id="CommunityName">&nbsp;</span>
+            <a href="#" class="highlightButton" id="CommunityName">&nbsp;</a>
 
             <div id="titlebar-left">
                 [Search] <a href="#" class="highlightButton">(Search)</a>
@@ -423,11 +423,11 @@
             <table width="100%"><tr><td width="30%" valign="top">
                 <!-- left column -->
 
-                <div class="panel">
+                <div class="panel non-public-panel">
                     <div class="panel-header">Discussion Threads</div>
                     <div class="panel-body"></div>
                 </div>
-                <div class="panel">
+                <div class="panel non-public-panel">
                     <div class="panel-header">Recent Blog Posts</div>
                     <div class="panel-body"></div>
                 </div>
@@ -440,22 +440,33 @@
                     <div class="panel-body" id="WelcomeMessage">
                     </div>
                 </div>
-                <div class="panel">
+                <div class="panel non-public-panel">
                     <div class="panel-header">Recent Activity</div>
                     <div class="panel-body"></div>
                 </div>
             </td><td width="30%" valign="top">
                 <!-- right column -->
-                <div class="panel">
+                <div class="panel non-public-panel">
                     <div class="panel-header">Recent Wiki Activity</div>
                     <div class="panel-body"></div>
                 </div>
-                <div class="panel">
+                <div class="panel non-public-panel">
                     <div class="panel-header">Upcoming Events</div>
                     <div class="panel-body"></div>
                 </div>
             </td></tr></table>
         </div>
+
+        <script type="text/javascript">
+            var showHomePage = function () {
+                if (userid != null || globalSettings.publicAccess)
+                    $(".non-public-panel").show();
+                else
+                    $(".non-public-panel").hide();
+
+                $("#divHomePage").show();
+            };
+        </script>
 
         <!-- global -->
         <script type="text/javascript">
@@ -487,6 +498,7 @@
                 socket.emit("logout", null);
                 loggedIn = false;
                 username = "";
+                userid = null;
                 $("#loginName").text("Log in");
                 // forget that we were logged in, so we don't log back in when the user reloads the page
                 clearCookies();
@@ -529,6 +541,8 @@
                     $("#CommunityName").text(globalSettings.communityName);
                     $("#WelcomeMessage").text(globalSettings.welcomeMessage);
 
+                    $(window).hashchange();
+
                     // see if we have our username and password stored in a cookie
                     var usrn = $.cookie('username');
                     var paswd = $.cookie('password');
@@ -536,9 +550,6 @@
                     if (usrn !== undefined && paswd !== undefined) {
                         socket.emit('login', { username: usrn, password: paswd });
                     }
-
-                    if (globalSettings.publicAccess)
-                        $(window).hashchange();
                 });
 
                 socket.on('globalUserSettings', function (data) {
@@ -571,9 +582,39 @@
             var reloadPage = function () {
             };
 
+            // hide all existing pages so we can later only show the one we want
+            var hideExistingPages = function () {
+                $("#divHomePage").hide();
+            };
+
             var hashchange = function () {
                 if (location.hash === '#')
                     alert("Hash is '#' - forgot to handle!");
+
+                var hash = location.hash;
+
+                if (userid == null && !globalSettings.publicAccess)
+                    hash = ''; // homepage if there's no public access
+                
+                var leftSection = hash;
+                var splitter = hash.indexOf('/');
+                if (splitter >= 0)
+                    leftSection = leftSection.substr(0, splitter);
+
+                // hide all existing tabs
+                hideExistingPages();
+                
+                switch (leftSection) {
+                    case "#blogs":
+                    case "#courses":
+                    case "#discussions":
+                    case "#events":
+                    case "#wiki":
+                        console.log(leftSection + " not yet implemented");
+                        break;
+                    default:
+                        showHomePage();
+                }
             };
         </script>
     </body>

@@ -42,13 +42,15 @@
     margin-right:auto;
 }
 
-.highlightButton:active, .highlightButton:visited, .highlightButton a {
+.highlightButton:active, .highlightButton:visited, .highlightButton {
     color: black;
+    text-decoration:none;
 }
 
 .highlightButton:hover {
     color: black;
     background-color: #a3a3a3;
+    text-decoration:none;
 }
 
 body {
