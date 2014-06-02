@@ -468,6 +468,34 @@
             };
         </script>
 
+        <!-- discussions page-->
+        <div id="divDiscussionsPage" style="display:none;">
+            <table width="100%"><tr><td width="30%" valign="top">
+                <!-- left column -->
+                <div class="panel">
+                    <div class="panel-header">Recent Treads</div>
+                    <div class="panel-body"></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">Recent Posts</div>
+                    <div class="panel-body"></div>
+                </div>
+            </td><td width="70%" valign="top">
+                <!-- middle/right column -->
+                <div class="panel">
+                    <div class="panel-header">Discussion Forums</div>
+                    <div class="panel-body">
+                    </div>
+                </div>
+            </td></tr></table>
+        </div>
+
+        <script type="text/javascript">
+            var showDiscussionsPage = function () {
+                $("#divDiscussionsPage").show();
+            };
+        </script>
+
         <!-- global -->
         <script type="text/javascript">
             var socket = null; // socket object
@@ -585,6 +613,7 @@
             // hide all existing pages so we can later only show the one we want
             var hideExistingPages = function () {
                 $("#divHomePage").hide();
+                $("#divDiscussionsPage").hide();
             };
 
             var hashchange = function () {
@@ -605,15 +634,12 @@
                 hideExistingPages();
                 
                 switch (leftSection) {
-                    case "#blogs":
-                    case "#courses":
-                    case "#discussions":
-                    case "#events":
-                    case "#wiki":
-                        console.log(leftSection + " not yet implemented");
-                        break;
-                    default:
-                        showHomePage();
+                    case "#blogs": break;
+                    case "#courses": break;
+                    case "#discussions": showDiscussionsPage(); break;
+                    case "#events": break;
+                    case "#wiki": break;
+                    default: showHomePage(); break;
                 }
             };
         </script>
