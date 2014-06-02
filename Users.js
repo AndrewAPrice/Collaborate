@@ -13,11 +13,12 @@ var crypto = require('crypto');
 var mail = require('nodemailer').mail;
 
 var Server = require('./Server.js');
+var Database = require('./Database.js');
 
 // var usersDb = db.get('users');
 // usersDb.index('id', { unique: true});
 
-var users = require('./JSONStorage.js').load('./storage/users.json');
+// var users = require('./JSONStorage.js').load('./storage/users.json');
 
 // the salt used for encrypting passwords - changing this will break users' passwords!
 // if you're using this in a production environment you may generate a unique salt
@@ -28,9 +29,7 @@ exports.globalSettings = {
     // Can users register through the site? If this is false Administrators must manually add new users.
     canRegister: true,
     // password requirements to display to the user
-    passwordRequirements:  "Passwords must be at least 6 characters long.",
-    // do we need to verify the user's email address?
-    verifyEmail: true
+    passwordRequirements:  "Passwords must be at least 6 characters long."
 };
 
 // users.object contains all users the lowercase username is the key
@@ -48,7 +47,7 @@ var isValidPassword = function(password) {
 };
 
 // generates an email confirmation key, returns null if we don't use verification
-var generateEmailVerificationCode = function(callback) {
+/*var generateEmailVerificationCode = function(callback) {
     if(exports.globalSettings.verifyEmail == false) {
         callback(null);
         return;
@@ -57,12 +56,12 @@ var generateEmailVerificationCode = function(callback) {
     crypto.randomBytes(4, function(ex, buf) {
         callback(buf.toString('hex').toLowerCase());
     });
-};
+};*/
 
 // sends a configmration email
-var sendVerificationEmail = function(username, email, token) {
-    var message = "=="+Server.globalSettings.wikiName+"==\n";
-    message += username + ", thank you for registering an account.\n";
+var sendVerificationEmail = function(realname, username, email, token) {
+    var message = "=="+Server.globalSettings.communityName+"==\n";
+    message += realname + ", thank you for registering an account. Your username is: " + username + "\n";
     message += "When you log in you will be prompted to provide this verification code: " + token + "\n\n";
     message += Server.globalServerSettings.siteAddress + "\n";
 
@@ -75,6 +74,22 @@ var sendVerificationEmail = function(username, email, token) {
 
 // authenticates a user, returns the user object if the credentials are valid, null otherwise
 exports.authenticate = function(username, password, callback) {
+    Database.authenticateUser(username, password, function(status, rows) {
+        if(status !== "success")
+            callback({status: status}, null);
+        else {
+            var userid = rows[0]["id"];
+            // todo, get messages
+            Database.getUserRealname(userid, function(status, rows) {
+                if(status !== "success")
+                    callback({status: status});
+                else
+                    callback({status: status, userid: userid, realname: rows[0]["realname"]});
+            });
+        }
+    });
+
+    /*
     // convert the username to lower case and trim it, so we can use it as a key
     var id = username.toLowerCase().trim();
 
@@ -106,27 +121,28 @@ exports.authenticate = function(username, password, callback) {
 
         // all is good
         callback({status: "success", id: id, username: user.username, uiMessages: user.uiMessages});
-    });
+    });*/
 };
 
 // creates a new user
-exports.createUser = function(username, password, email, callback) {
-    if(username === undefined || password === undefined || email === undefined ||
+exports.createUser = function(username, realname, email, callback) {
+    if(username === undefined || realname === undefined || email === undefined ||
         exports.globalSettings.canRegister == false) {
         callback({ status: "badusername" });
         return;
     }
 
     // test the username
-    var id = username.toLowerCase().trim();
-    if(id.length == 0) {
+    username = username.toLowerCase().trim();
+    if(username.length == 0) {
         callback({ status: "badusername" });
         return;
     }
 
-    // test the password
-    if(!isValidPassword(password)) {
-        callback({ status: "badpassword" });
+    // test the realname
+    realname = realname.trim();
+    if(realname.length == 0) {
+        callback({ status: "badrealname" });
         return;
     }
 
@@ -137,102 +153,52 @@ exports.createUser = function(username, password, email, callback) {
         return;
     }
 
-    // encrypt the password
-    bcrypt.hash(password, salt, null, function(error, result) {
-        if(error) {
-            callback({status: "badpassword"});
-            return;
+    // create the user on the database
+    Database.createUser(username, email, realname, function(status, result) {
+        if(status !== "success")
+            callback({ status: "badusername" });
+        else {
+            var token = result[0].token;
+            sendVerificationEmail(realname, username, email, token);
+            callback({ status: "verifyemail" }); // send a verification email
         }
-
-        password = result;
-
-        // generate a random email verification token
-        generateEmailVerificationCode(function(token) {
-            // callbacks are done, check if the user already exists
-            if(users.object[id] !== undefined) {
-                callback({status: "userexists"});
-                return;
-            }
-
-            // insert us
-            users.object[id] = {
-                id: id,
-                username: username,
-                password: password,
-                email: email,
-                verify: token,
-                uiMessages: {}
-            };
-            users.invalidate();
-            
-            if(exports.globalSettings.verifyEmail == true) {
-                sendVerificationEmail(username, email, token);
-                callback({ status: "verifyemail" }); // send a verification email
-            } else
-                callback({ status: "success" }); // user is created!
-        });
     });
 };
 
-// deletes a user
-// must either be ourself, or an administrator
-exports.deleteUser = function(username, callerid, callback) {
-};
-
 exports.resendVerificationEmail = function(username) {
-    var id = username.toLowerCase().trim();
+    username = username.toLowerCase().trim();
 
     // check if the username is valid
-    if(id.length === 0) {
-        return;
-    }
-
-    // fetch user
-    var user = users.object[id];
-    // the user does not exist
-    if(user === undefined)
-        return;
-
-    if(user.verify !== null && exports.globalSettings.verifyEmail) {
-        // they need to verify their email address
-        sendVerificationEmail(user.username, user.email, user.verify);
-    };
-};
-
-exports.verifyEmail = function(username, token, callback) {
-    var id = username.toLowerCase().trim();
-
-    // check if the username is valid
-    if(id.length === 0) {
-        callback({ status: "badcode" });
-        return;
-    }
-
-    // fetch user
-    var user = users.object[id];
-    // the user does not exist
-    if(user === undefined) {
-        callback({ status: "badcode" });
+    if(username.length === 0) {
         return;
     }
     
-    if(user.verify !== null && exports.globalSettings.verifyEmail) {
-        // they need to verify their email address
-        // sendVerificationEmail(user.username, user.email, user.verify);
-        if(user.verify !== token)
-            callback({ status: "badcode" });
-        else {
-            // verified
-            user.verify = null;
-            users.invalidate();
-            
-            // the user validated their code
-            callback({ status: "success" });
-        }
-    } else {
-        // the user does not need to verify their email address
+    // generate them a new token and get the necessary fields to send them a new vertification email
+    Database.resetUserToken(username, function(status, results) {
+        if(status !== "success")
+            return;
+        
+        sendVerificationEmail(results[0].realname, results[0].username, results[0].email, results[0].token);
+    });
+};
+
+exports.verifyEmail = function(username, token, callback) {
+    username = username.toLowerCase().trim();
+
+    // check if the username is valid
+    if(username.length === 0) {
         callback({ status: "badcode" });
+        return;
     }
+
+    token = token.trim();
+
+    Database.verifyUser(username, token | 0, function(status, result) {
+        if(status !== "success")
+            callback({ status: status });
+        else // send the user their new password
+            callback({ status: "success", password: result[0].password });
+    });
 };
 
 // gets a user object - returns null if the user doesn't exist
