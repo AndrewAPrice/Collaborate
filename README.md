@@ -13,17 +13,23 @@ You need Node.js installed, and install the following dependencies via npm:
 - socket.io
 - bcrypt-nodejs
 - nodemailer
+- mysql
 
 The following client side Javascript libraries come with the code:
 - jQuery
 - jQuery.cookies
 - jqWidgets
 - TinyMCE
+- jQuery hashchange
+
+Collaborate uses MariaDB as the database backend, although MySQL should also work. If you wish to port it to another database,
+you'll need to edit Database.js and port mariadb.sql.
 
 ## Running
-To run, make sure you have Node.js installed and call:
-
-node app.js
+- Set up the database by running mariadb.sql on a MariaDB or MySQL database server.
+- Modify the connection settings in Database.js to connect to your database.
+- Create a default user by calling the procedure create_user on the database.
+- Make sure you have Node.js and dependencies installed and call "node app.js".
 
 ## Current features
 - Registration and optional e-mail verification for users.
