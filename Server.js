@@ -8,32 +8,33 @@ var app = require('express')();
 var server = require('http').createServer(app);
 var io = require('socket.io').listen(server);
 
+var Database = require('./Database.js');
 var Users = require('./Users.js');
+var Pages = require('./Pages.js');
+var Settings = require('./Settings.js');
 
 // global settings for the Wiki (sent to the user)
 exports.globalSettings = {
     // The wiki name (appears at the top of the wiki)
-    wikiName: "Collaborate Test Wiki"
+    communityName: null,
+    // Welcome message that appears on the home page
+    welcomeMessage: null,
+    // Can users access the site without being logged in?
+    publicAccess: null
 };
 
 // global settings for the Wiki (not sent to the user)
 exports.globalServerSettings = {
     // The port we should run the wiki on
-    port: 81,
-    // Can users access the Wiki without being logged in?
-    publicAccess: true,
+    port: null,
     // The address that emails coming from the Wiki come from
-    emailAddress: "Collaborate <collaborate@test.com>",
+    emailAddress: null,
     // The address that users can access this site at (for sending out links via email)
-    siteAddress: "http://localhost:81/"
+    siteAddress: null
 };
 
+// register site handlers
 app.get('/', function(req, res) {
-    // redirect to the wiki page
-    res.redirect('/wiki/');
-});
-
-app.get(/\/wiki\/(.*)/, function(req, res) {
     res.sendfile('client/index.html');
 });
 
@@ -43,8 +44,20 @@ app.get(/\/client\/(.*)/, function(req, res) {
 
 // start the server
 exports.initialize = function() {
-    // start the server
-    server.listen(exports.globalServerSettings.port);
+    // load in settings
+    Settings.initialize(function() {
+        // grab the ones we're interested in
+        exports.globalSettings.communityName = Settings.getSetting('community_name');
+        exports.globalSettings.welcomeMessage = Settings.getSetting('welcome_message');
+        exports.globalSettings.publicAccess = Settings.getSetting('public_access') === 'true';
+
+        exports.globalServerSettings.emailAddress = Settings.getSetting('email_address');
+        exports.globalServerSettings.port = Settings.getSetting('port') | 0;
+
+        // start the server
+        server.listen(exports.globalServerSettings.port);
+        console.log("Listening on port " + exports.globalServerSettings.port);
+    });
 };
 
 // called when a new socket connection is initialized
@@ -52,11 +65,8 @@ io.sockets.on('connection', function(socket) {
     // socket not logged in:
     socket.loggedIn = false;
 
-    // socket id (the username trimmed and in lowercase)
+    // socket id
     socket.userid = "";
-
-    // socket username
-    socket.username = "";
 
     // send global settings
     socket.emit('globalSettings', exports.globalSettings);
@@ -84,10 +94,8 @@ io.sockets.on('connection', function(socket) {
             if(response.status === "success") {
                 // save user info on socket if successful
                 socket.loggedIn = true;
-                socket.userid = response.id;
-                socket.username = response.username;
+                socket.userid = response.userid;
             }
-
             socket.emit("loginResponse", response);
         });
     });
@@ -95,14 +103,14 @@ io.sockets.on('connection', function(socket) {
     // user requests to create a user
     socket.on('createUser', function(data) {
         // check params were passed in
-        if(typeof data !== 'object' || data.username === undefined || data.password === undefined || data.email === undefined
+        if(typeof data !== 'object' || data.username === undefined || data.realname === undefined || data.email === undefined
             // cannot register if we are already logged in
             || socket.loggedIn == true) {
             socket.emit("createUserResponse", { status: "badusername" });
         }
 
         // create the user
-        Users.createUser(data.username, data.password, data.email, function(response) {
+        Users.createUser(data.username, data.realname, data.email, function(response) {
             socket.emit("createUserResponse", response);
         });
     });
@@ -148,5 +156,39 @@ io.sockets.on('connection', function(socket) {
     // the user disconnects
     socket.on('disconnect', function() {
         logout();
+    });
+
+    // user tries to load a page
+    socket.on('loadPage', function() {
+        // if not logged in and non anonymous access, can't load page
+        if(socket.loggedIn == false && !exports.globalSettings.publicAccess)
+            return;
+        
+        // test parameters
+        if(typeof data !== 'object' || data.path === undefined || data.redirect === undefined)
+            return;
+        
+        // request the page
+        Pages.loadPage(socket.userid, data.path, data.redirect, function(result) {
+            // return the result
+            socket.emit('loadPageResult', result);
+        });
+    });
+
+    // user tries to create a page
+    socket.on('createPage', function(data) {
+        // must be logged in
+        if(socket.loggedIn == false)
+            return;
+
+        // test parameters
+        if(typeof data !== 'object' || data.path === undefined)
+            return;
+        
+        // create the page
+        Pages.createPage(socket.userid, data.path, function(result) {
+            // return the result
+            socket.emit('createPageResult', result);
+        });
     });
 });
