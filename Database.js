@@ -1,4 +1,11 @@
-﻿var mysql = require('mysql');
+﻿/*****************************************************************************
+Database
+
+Storage backend/abstraction layer for MySQL/MariaDB.
+
+******************************************************************************/
+
+var mysql = require('mysql');
 
 // modify this to access your database
 var databaseSettings = {
@@ -102,4 +109,17 @@ exports.getSettings = function(callback) {
 
 exports.setSetting = function(setting, value) {
     callSql("CALL set_setting(" + pool.escape(setting) + "," + pool.escape(value) + ")", false, function(status, result) {});
+};
+
+// discussions
+exports.getDiscussionForums = function(callback) {
+    callSql("CALL get_discussion_forums()", false, callback);
+};
+
+exports.getRecentDiscussionPosts = function(callback) {
+    callSql("CALL get_recent_discussion_posts()", false, callback);
+};
+
+exports.getRecentDiscussionThreads = function(callback) {
+    callSql("CALL get_recent_discussion_threads()", false, callback);
 };

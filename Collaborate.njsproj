@@ -36,6 +36,7 @@
   <ItemGroup>
     <Compile Include="app.js" />
     <Compile Include="Database.js" />
+    <Compile Include="Discussions.js" />
     <Compile Include="JSONStorage.js" />
     <Compile Include="Settings.js" />
     <Compile Include="Storage.js" />

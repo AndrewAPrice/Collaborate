@@ -9,9 +9,10 @@ var server = require('http').createServer(app);
 var io = require('socket.io').listen(server);
 
 var Database = require('./Database.js');
-var Users = require('./Users.js');
+var Discussions = require('./Discussions.js');
 var Pages = require('./Pages.js');
 var Settings = require('./Settings.js');
+var Users = require('./Users.js');
 
 // global settings for the Wiki (sent to the user)
 exports.globalSettings = {
@@ -53,6 +54,8 @@ exports.initialize = function() {
 
         exports.globalServerSettings.emailAddress = Settings.getSetting('email_address');
         exports.globalServerSettings.port = Settings.getSetting('port') | 0;
+
+        Discussions.initialize();
 
         // start the server
         server.listen(exports.globalServerSettings.port);
@@ -158,6 +161,53 @@ io.sockets.on('connection', function(socket) {
         logout();
     });
 
+    socket.on('loadHomePage', function() {
+        Discussions.getRecentThreads(function(status, result1) {
+            socket.emit('loadDiscussionsResponse', {
+                        threads: result1
+            });
+        });
+    });
+
+    // get recent threads
+    socket.on('recentThreads', function() {
+        if(socket.isLoggedIn == false && !exports.globalSettings.publicAccess)
+            return;
+
+        Discussions.getRecentThreads(function(status, result) {
+            if(status !== "success") return;
+
+            socket.emit('recentThreadsResponse', {
+                threads: result,
+            });
+        });
+    });
+
+    // load discussions, getting recent threads, posts, discussion forums
+    socket.on('loadDiscussions', function() {
+        if(socket.isLoggedIn == false && !exports.globalSettings.publicAccess)
+            return;
+
+        Discussions.getRecentThreads(function(status, result1) {
+            if(status !== "success") return;
+
+            Discussions.getRecentPosts(function(status, result2) {
+                if(status !== "success") return;
+
+                Discussions.getDiscussionForums(function(status, result3) {
+                    if(status !== "success") return;
+
+                    socket.emit('loadDiscussionsResponse', {
+                        threads: result1,
+                        posts: result2,
+                        forums: result3
+                    });
+                });
+            });
+        });
+    });
+
+    /*
     // user tries to load a page
     socket.on('loadPage', function() {
         // if not logged in and non anonymous access, can't load page
@@ -190,5 +240,5 @@ io.sockets.on('connection', function(socket) {
             // return the result
             socket.emit('createPageResult', result);
         });
-    });
+    });*/
 });
