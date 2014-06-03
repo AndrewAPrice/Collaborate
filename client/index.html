@@ -425,7 +425,7 @@
                 <!-- left column -->
 
                 <div class="panel non-public-panel">
-                    <div class="panel-header">Discussion Threads</div>
+                    <div class="panel-header">Recent Discussion Threads</div>
                     <div class="panel-body"></div>
                 </div>
                 <div class="panel non-public-panel">
@@ -466,6 +466,7 @@
                     $(".non-public-panel").hide();
 
                 $("#divHomePage").show();
+                socket.emit("recentThreads", null);
             };
         </script>
 
@@ -474,18 +475,26 @@
             <table width="100%"><tr><td width="30%" valign="top">
                 <!-- left column -->
                 <div class="panel">
-                    <div class="panel-header">Recent Treads</div>
-                    <div class="panel-body"></div>
+                    <div class="panel-header">Recent Threads</div>
+                    <div class="panel-body">
+                        <div class="loading-fixed" id="discussionsPageThreadsLoading"></div>
+                        <div id="discussionsPageThreads"></div>
+                    </div>
                 </div>
                 <div class="panel">
                     <div class="panel-header">Recent Posts</div>
-                    <div class="panel-body"></div>
+                    <div class="panel-body">
+                        <div class="loading-fixed" id="discussionPagePostsLoading"></div>
+                        <div id="discussionPagePosts"></div>
+                    </div>
                 </div>
             </td><td width="70%" valign="top">
                 <!-- middle/right column -->
                 <div class="panel">
                     <div class="panel-header">Discussion Forums</div>
                     <div class="panel-body">
+                        <div class="loading-fixed" id="discussionPageForumsLoading"></div>
+                        <div id="discussionPageForums"></div>
                     </div>
                 </div>
             </td></tr></table>
@@ -493,7 +502,68 @@
 
         <script type="text/javascript">
             var showDiscussionsPage = function () {
+                $("#discussionsPageThreadsLoading").show();
+                $("#discussionPagePostsLoading").show();
+                $("#discussionPageForumsLoading").show();
+
+                $("#discussionsPageThreads").hide();
+                $("#discussionPagePosts").hide();
+                $("#discussionPageForums").hide();
+
                 $("#divDiscussionsPage").show();
+
+
+                socket.emit("loadDiscussions", null);
+            };
+
+            var loadDiscussionsResponse = function (data) {
+                $("#discussionsPageThreadsLoading").hide();
+                $("#discussionPagePostsLoading").hide();
+                $("#discussionPageForumsLoading").hide();
+
+                var html = "<ul>";
+                for (var i = 0 ; i < data.threads.length; i++) {
+                    html += "<li><small><a href='#threads/" + data.threads[i].thread_id + "'>" + data.threads[i].thread_title + "</a> ";
+                    html += "in <a href='#forums/" + data.threads[i].forum_id + "'>" + data.threads[i].forum_title + "</a>";
+                    html += "<br />Latest post by <a href='#members/" + data.threads[i].last_post_by + "'>" + data.threads[i].last_post_by_username + "</a> ";
+                    html += "on " + data.threads[i].last_post + "</small></li>";
+                }
+                html += "</ul>";
+                $("#discussionsPageThreads").html(html);
+                $("#discussionsPageThreads").show();
+
+                html = "<ul>";
+                for (var i = 0 ; i < data.posts.length; i++) {
+                    html += "<li><small><a href='#threads/" + data.posts[i].thread_id + "/" + data.posts[i].post_id + "'>" + data.posts[i].thread_title + "</a> ";
+                    html += "in <a href='#forums/" + data.posts[i].forum_id + "'>" + data.posts[i].forum_title + "</a><br /><i>";
+                    html += data.posts[i].preview;
+                    html += "</i><br />Posted by <a href='#members/" + data.posts[i].post_by + "'>" + data.posts[i].post_by_username + "</a> ";
+                    html += "on " + data.posts[i].posted + "</small></li>";
+                }
+                html += "</ul>";
+                $("#discussionPagePosts").html(html);
+                $("#discussionPagePosts").show();
+
+                html = "<table class='alternating-table' width='100%'>";
+                for (var i = 0; i < data.forums.length; i++) {
+                    html += "<tr><td>";
+                    html += "<a href='#forums/" + data.forums[i].forum_id + "'>" + data.forums[i].forum_title + "</a><br />";
+                    html += "</td><td><small>";
+                    if (data.forums[i].latest_post_title !== null) {
+                        html += "Latest post in <a href='#threads/" + data.forums[i].latest_thread_id + "'>";
+                        html += data.forums[i].latest_post_title + "</a> by ";
+                        html += "<a href='#members/" + data.forums[i].latest_post_uid + "'>" + data.forums[i].latest_post_realname + "</a> ";
+                        html += "on " + data.forums[i].latest_post;
+                    } else
+                       html += "No posts.";
+                    html += "</small></td></tr>";
+                }
+                html += "</table>";
+
+                $("#discussionPageForums").html(html);
+                $("#discussionPageForums").show();
+
+                console.log(data);
             };
         </script>
 
@@ -570,15 +640,14 @@
                     $("#CommunityName").text(globalSettings.communityName);
                     $("#WelcomeMessage").text(globalSettings.welcomeMessage);
 
-                    $(window).hashchange();
-
                     // see if we have our username and password stored in a cookie
                     var usrn = $.cookie('username');
                     var paswd = $.cookie('password');
 
                     if (usrn !== undefined && paswd !== undefined) {
                         socket.emit('login', { username: usrn, password: paswd });
-                    }
+                    } else
+                        $(window).hashchange();
                 });
 
                 socket.on('globalUserSettings', function (data) {
@@ -598,6 +667,8 @@
                 socket.on('loginResponse', loginResponse);
                 socket.on('createUserResponse', createUserResponse);
                 socket.on('verifyEmailResponse', verifyEmailResponse);
+
+                socket.on('loadDiscussionsResponse', loadDiscussionsResponse);
 
                 $(window).hashchange(hashchange);
             });
@@ -635,13 +706,17 @@
                 hideExistingPages();
                 
                 switch (leftSection) {
+                    case "": showHomePage(); break;
                     case "#blogs": break;
                     case "#courses": break;
                     case "#discussions": showDiscussionsPage(); break;
+                    case "#forums": break;
+                    case "#threads": break;
                     case "#events": break;
+                    case "#members": break;
                     case "#uploads": break;
                     case "#wiki": break;
-                    default: showHomePage(); break;
+                    default: break;
                 }
             };
         </script>
