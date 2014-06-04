@@ -98,6 +98,8 @@ io.sockets.on('connection', function(socket) {
                 // save user info on socket if successful
                 socket.loggedIn = true;
                 socket.userid = response.userid;
+                socket.forumAdmin = response.forumAdmin;
+                socket.forumModerator = response.forumModerator;
             }
             socket.emit("loginResponse", response);
         });
@@ -162,9 +164,9 @@ io.sockets.on('connection', function(socket) {
     });
 
     socket.on('loadHomePage', function() {
-        Discussions.getRecentThreads(function(status, result1) {
-            socket.emit('loadDiscussionsResponse', {
-                        threads: result1
+        Discussions.getRecentThreads(function(status, result) {
+            socket.emit('loadHomePageResponse', {
+                        threads: result
             });
         });
     });
@@ -204,6 +206,108 @@ io.sockets.on('connection', function(socket) {
                     });
                 });
             });
+        });
+    });
+
+    // create a new forum
+    socket.on('createDiscussionForum', function(data) {
+        if(socket.isLoggedIn == false || typeof data !== 'object' || typeof data.title !== 'string')
+            return;
+        
+        if(socket.forumAdmin !== true) {
+            socket.emit("createDiscussionForumResponse", {status: "nopermission"});
+            return;
+        }
+
+        var title = data.title.trim();
+        if(title.length == 0) {
+            socket.emit("createDiscussionForumResponse", {status: "badname"});
+            return;
+        }
+
+        Discussions.createDiscussionForum(title, function(status, result1) {
+            if(status !== "success") {
+                socket.emit("createDiscussionForumResponse", {status: status});
+                return;
+            }
+
+            Discussions.getDiscussionForums(function(status, result2) {
+                    if(status !== "success") {
+                        socket.emit("createDiscussionForumResponse", {status: status});
+                        return;
+                    }
+
+                    socket.emit('createDiscussionForumResponse', {
+                        status: "success",
+                        forums: result2
+                    });
+                });
+        });
+    });
+
+    // set the discussion forum's title
+    socket.on('setDiscussionForumTitle', function(data) {
+        if(socket.isLoggedIn == false || typeof data !== 'object' || typeof data.title !== 'string' || data.id === undefined)
+            return;
+        
+        if(socket.forumAdmin !== true) {
+            socket.emit("setDiscussionForumTitleResponse", {status: "nopermission"});
+            return;
+        }
+
+        var title = data.title.trim();
+        if(title.length == 0) {
+            socket.emit("setDiscussionForumTitleResponse", {status: "badname"});
+            return;
+        }
+
+        Discussions.setDiscussionForumTitle(data.id, title, function(status, result1) {
+            if(status !== "success") {
+                socket.emit("setDiscussionForumTitleResponse", {status: status});
+                return;
+            }
+
+            Discussions.getDiscussionForums(function(status, result2) {
+                    if(status !== "success") {
+                        socket.emit("setDiscussionForumTitleResponse", {status: status});
+                        return;
+                    }
+
+                    socket.emit('setDiscussionForumTitleResponse', {
+                        status: "success",
+                        forums: result2
+                    });
+                });
+        });
+    });
+
+    // delete a discussion forum
+    socket.on('deleteDiscussionForum', function(data) {
+        if(socket.isLoggedIn == false || typeof data !== 'object' || data.id === undefined)
+            return;
+        
+        if(socket.forumAdmin !== true) {
+            socket.emit("deleteDiscussionForumResponse", {status: "nopermission"});
+            return;
+        }
+
+        Discussions.deleteDiscussionForum(data.id, function(status, result1) {
+            if(status !== "success") {
+                socket.emit("deleteDiscussionForumResponse", {status: status});
+                return;
+            }
+
+            Discussions.getDiscussionForums(function(status, result2) {
+                    if(status !== "success") {
+                        socket.emit("deleteDiscussionForumResponse", {status: status});
+                        return;
+                    }
+
+                    socket.emit('deleteDiscussionForumResponse', {
+                        status: "success",
+                        forums: result2
+                    });
+                });
         });
     });
 

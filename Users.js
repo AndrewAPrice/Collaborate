@@ -80,11 +80,15 @@ exports.authenticate = function(username, password, callback) {
         else {
             var userid = rows[0]["id"];
             // todo, get messages
-            Database.getUserRealname(userid, function(status, rows) {
+            Database.getUserLoginInformation(userid, function(status, rows) {
                 if(status !== "success")
                     callback({status: status});
                 else
-                    callback({status: status, userid: userid, realname: rows[0]["realname"]});
+                    callback({status: status,
+                        userid: userid,
+                        realname: rows[0].realname,
+                        forumAdmin: rows[0].forum_admin !== null ? rows[0].forum_admin.readUInt8(0) == 1 :null,
+                        forumModerator: rows[0].forum_moderator !== null ?  rows[0].forum_moderator.readUInt8(0) == 1 : null});
             });
         }
     });

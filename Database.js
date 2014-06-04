@@ -82,6 +82,11 @@ exports.authenticateUser = function(username, password, callback) {
         true, callback);
 };
 
+exports.getUserLoginInformation = function(userid, callback) {
+    callSql("CALL get_user_login_information(" + pool.escape(userid) + ")",
+        false, callback);
+};
+
 exports.getUserRealname = function(userid, callback) {
     callSql("CALL get_user_realname(" + pool.escape(userid) + ",@status)",
         true, callback);
@@ -122,4 +127,16 @@ exports.getRecentDiscussionPosts = function(callback) {
 
 exports.getRecentDiscussionThreads = function(callback) {
     callSql("CALL get_recent_discussion_threads()", false, callback);
+};
+
+exports.createDiscussionForum = function(title, callback) {
+    callSql("CALL create_discussion_forum(" + pool.escape(title) + ")", false, callback);
+};
+
+exports.setDiscussionForumTitle = function(forumid, title, callback) {
+    callSql("CALL set_discussion_forum_title(" + pool.escape(forumid) + "," + pool.escape(title) + ")", false, callback);
+};
+
+exports.deleteDiscussionForum = function(forumid, callback) {
+    callSql("CALL delete_discussion_forum(" + pool.escape(forumid) + ")", false, callback);
 };

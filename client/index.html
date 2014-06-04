@@ -188,10 +188,10 @@
                     loggedIn = true;
                     userid = data.userid;
                     realname = data.realname;
+                    forumAdmin = data.forumAdmin;
+                    forumModerator = data.forumModerator;
 
                     $("#loginName").text(realname);
-
-                    // reloadPage();
 
                     if (globalSettings.publicAccess == false)
                         $(window).hashchange();
@@ -426,7 +426,10 @@
 
                 <div class="panel non-public-panel">
                     <div class="panel-header">Recent Discussion Threads</div>
-                    <div class="panel-body"></div>
+                    <div class="panel-body">
+                        <div class="loading-fixed" id="homePageRecentThreadsLoading"></div>
+                        <div id="homePageRecentThreads"></div>
+                    </div>
                 </div>
                 <div class="panel non-public-panel">
                     <div class="panel-header">Recent Blog Posts</div>
@@ -464,9 +467,18 @@
                     $(".non-public-panel").show();
                 else
                     $(".non-public-panel").hide();
-
+                
+                $("#homePageRecentThreads").hide();
+                $("#homePageRecentThreadsLoading").show();
                 $("#divHomePage").show();
-                socket.emit("recentThreads", null);
+                socket.emit("loadHomePage", null);
+            };
+
+            var loadHomePageResponse = function(data) {
+                $("#homePageRecentThreadsLoading").hide();
+                var html = generateRecentThreadsHTML(data.threads);
+                $("#homePageRecentThreads").html(html);
+                $("#homePageRecentThreads").show();
             };
         </script>
 
@@ -475,14 +487,14 @@
             <table width="100%"><tr><td width="30%" valign="top">
                 <!-- left column -->
                 <div class="panel">
-                    <div class="panel-header">Recent Threads</div>
+                    <div class="panel-header">Recent Discussion Threads</div>
                     <div class="panel-body">
                         <div class="loading-fixed" id="discussionsPageThreadsLoading"></div>
                         <div id="discussionsPageThreads"></div>
                     </div>
                 </div>
                 <div class="panel">
-                    <div class="panel-header">Recent Posts</div>
+                    <div class="panel-header">Recent Discussion Posts</div>
                     <div class="panel-body">
                         <div class="loading-fixed" id="discussionPagePostsLoading"></div>
                         <div id="discussionPagePosts"></div>
@@ -495,13 +507,20 @@
                     <div class="panel-body">
                         <div class="loading-fixed" id="discussionPageForumsLoading"></div>
                         <div id="discussionPageForums"></div>
+                         <input type="button" value="Create A New Forum" id="btnDiscussionsPageNewForum" />
                     </div>
                 </div>
             </td></tr></table>
         </div>
 
         <script type="text/javascript">
-            var showDiscussionsPage = function () {
+            $(function () {
+                $("#btnDiscussionsPageNewForum").jqxButton();
+                $("#btnDiscussionsPageNewForum").click(function () {
+                    showDiscussionsNewForumWindow();
+                });
+            });
+            var showDiscussionsPage = function (dontEmit) {
                 $("#discussionsPageThreadsLoading").show();
                 $("#discussionPagePostsLoading").show();
                 $("#discussionPageForumsLoading").show();
@@ -510,60 +529,375 @@
                 $("#discussionPagePosts").hide();
                 $("#discussionPageForums").hide();
 
+                $("#btnDiscussionsPageNewForum").hide();
+
                 $("#divDiscussionsPage").show();
 
+                if(dontEmit !== true)
+                    socket.emit("loadDiscussions", null);
+            };
 
-                socket.emit("loadDiscussions", null);
+            var generateRecentThreadsHTML = function(threads) {
+                var html = "<ul>";
+                for (var i = 0 ; i < threads.length; i++) {
+                    html += "<li><small><a href='#threads/" + threads[i].thread_id + "'>" + threads[i].thread_title + "</a> ";
+                    html += "in <a href='#forums/" + threads[i].forum_id + "'>" + threads[i].forum_title + "</a>";
+                    html += "<br />Latest post by <a href='#members/" + threads[i].last_post_by + "'>" + threads[i].last_post_by_username + "</a> ";
+                    html += "on " + threads[i].last_post + "</small></li>";
+                }
+                html += "</ul>";
+                return html;
             };
 
             var loadDiscussionsResponse = function (data) {
-                $("#discussionsPageThreadsLoading").hide();
-                $("#discussionPagePostsLoading").hide();
-                $("#discussionPageForumsLoading").hide();
+                var html;
 
-                var html = "<ul>";
-                for (var i = 0 ; i < data.threads.length; i++) {
-                    html += "<li><small><a href='#threads/" + data.threads[i].thread_id + "'>" + data.threads[i].thread_title + "</a> ";
-                    html += "in <a href='#forums/" + data.threads[i].forum_id + "'>" + data.threads[i].forum_title + "</a>";
-                    html += "<br />Latest post by <a href='#members/" + data.threads[i].last_post_by + "'>" + data.threads[i].last_post_by_username + "</a> ";
-                    html += "on " + data.threads[i].last_post + "</small></li>";
+                if (data.threads !== undefined) {
+                    $("#discussionsPageThreadsLoading").hide();
+                    html = generateRecentThreadsHTML(data.threads);
+                    $("#discussionsPageThreads").html(html);
+                    $("#discussionsPageThreads").show();
                 }
-                html += "</ul>";
-                $("#discussionsPageThreads").html(html);
+
+                if (data.posts !== undefined) {
+                    $("#discussionPagePostsLoading").hide();
+                    html = "<ul>";
+                    for (var i = 0 ; i < data.posts.length; i++) {
+                        html += "<li><small><a href='#threads/" + data.posts[i].thread_id + "/" + data.posts[i].post_id + "'>" + data.posts[i].thread_title + "</a> ";
+                        html += "in <a href='#forums/" + data.posts[i].forum_id + "'>" + data.posts[i].forum_title + "</a><br /><i>";
+                        html += data.posts[i].preview;
+                        html += "</i><br />Posted by <a href='#members/" + data.posts[i].post_by + "'>" + data.posts[i].post_by_username + "</a> ";
+                        html += "on " + data.posts[i].posted + "</small></li>";
+                    }
+                    html += "</ul>";
+                    $("#discussionPagePosts").html(html);
+                    $("#discussionPagePosts").show();
+                }
+
+                if (data.forums !== undefined) {
+                    $("#discussionPageForumsLoading").hide();
+                    html = "<table class='alternating-table' width='100%'>";
+                    for (var i = 0; i < data.forums.length; i++) {
+                        html += "<tr><td>";
+                        html += "<a href='#forums/" + data.forums[i].forum_id + "'>" + data.forums[i].forum_title + "</a><br />";
+                        html += "</td><td><small>";
+                        if (data.forums[i].latest_post_title !== null) {
+                            html += "Latest post in <a href='#threads/" + data.forums[i].latest_thread_id + "'>";
+                            html += data.forums[i].latest_post_title + "</a> by ";
+                            html += "<a href='#members/" + data.forums[i].latest_post_uid + "'>" + data.forums[i].latest_post_realname + "</a> ";
+                            html += "on " + data.forums[i].latest_post;
+
+                            // $("#btnDiscussionsPageNewForum").jqxButton();
+                        } else
+                            html += "No posts.";
+
+                        html += "</small></td>";
+                        if (forumAdmin)
+                            html += "<td><input type='button' value='Edit' id='btnDiscussionsPageEdit" + i + "' /></td>";
+
+                        html += "</tr>";
+                    }
+                    html += "</table>";
+
+                    $("#discussionPageForums").html(html);
+                    $("#discussionPageForums").show();
+                }
+                
+                if (forumAdmin) {
+                    $("#btnDiscussionsPageNewForum").show();
+                    for (var i = 0; i < data.forums.length; i++) {
+                        
+                        (function(j) {
+                            var name = "#btnDiscussionsPageEdit" + j;
+                            $(name).jqxButton();
+                            $(name).click(function () {
+                                showDiscussionsEditForumWindow(data.forums[j].forum_title, data.forums[j].forum_id);
+                            });
+                        })(i);
+                    }
+                }
+
+
+            };
+        </script>
+
+         <!-- discussions - new forum window -->
+        <div id="wndDiscussionsNewForum">
+            <div >New Forum</div>
+            <div class="centre">
+                <div id="divDiscussionsNewForumBody">
+                    <span id="spnDiscussionsNewForumStatus"></span>
+                    <table class="centre">
+                        <tr><td>Forum Name:</td><td><input type="text" id="tbDiscussionsNewForumName" /></td></tr>
+                    </table>
+                    <br />
+                        <input type="button" value="Create" id="btnDiscussionsNewForumCreate" />
+                        <input type="button" value="Cancel" id="btnDiscussionsNewForumCancel" />
+                </div>
+                <div class="loading" id="discussionsNewForumLoading"></div>
+            </div>
+        </div>
+        
+        <script type="text/javascript">
+            $(function () {
+                $("#wndDiscussionsNewForum").jqxWindow({ width: '360px', height: '120px', autoOpen: false });
+
+                $("#tbDiscussionsNewForumName").jqxInput().width("100%");
+                $("#btnDiscussionsNewForumCreate").jqxButton();
+                $("#btnDiscussionsNewForumCreate").click(function () {
+
+                    var title = $("#tbDiscussionsNewForumName").val().trim();
+                    if (title.length == 0) {
+                        $("#spnDiscussionsNewForumStatus").text("The forum name is not valid.");
+                        $("#spnDiscussionsNewForumStatus").addClass("error");
+                        return;
+                    }
+
+                    // show loading bar
+                    $("#divDiscussionsNewForumBody").hide();
+                    $("#discussionsNewForumLoading").show();
+
+                    // send request
+                    socket.emit('createDiscussionForum', { title: title });
+
+                });
+                $("#btnDiscussionsNewForumCancel").jqxButton();
+                $("#btnDiscussionsNewForumCancel").click(function () {
+                    $("#wndDiscussionsNewForum").jqxWindow("hide");
+                });
+            });
+
+            var showDiscussionsNewForumWindow = function () {
+                $("#tbDiscussionsNewForumName").val("");
+                $("#spnDiscussionsNewForumStatus").text("Please enter the name of the new forum to create.");
+                $("#spnDiscussionsNewForumStatus").removeClass("error");
+
+                $("#divDiscussionsNewForumBody").show();
+                $("#discussionsNewForumLoading").hide();
+                $("#wndDiscussionsNewForum").jqxWindow("show");
+            };
+
+            var createDiscussionForumResponse = function (data) {
+                if (data.status !== "success") {
+                    $("#spnDiscussionsNewForumStatus").addClass("error");
+
+                    if (data.status === "nopermission")
+                        $("#spnDiscussionsNewForumStatus").text("You don't have permission to create a forum.");
+                    else
+                        $("#spnDiscussionsNewForumStatus").text("The forum name is not valid.");
+
+
+                    $("#discussionsNewForumLoading").hide();
+                    $("#divDiscussionsNewForumBody").show();
+                } else {
+                    $("#wndDiscussionsNewForum").jqxWindow("hide");
+                    loadDiscussionsResponse(data);
+                }
+            };
+        </script>
+
+        <!-- discussions - new forum window -->
+        <div id="wndDiscussionsEditForum">
+            <div >Edit Forum</div>
+            <div class="centre">
+                <div id="divDiscussionsEditForumBody">
+                    <span id="spnDiscussionsEditForumStatus"></span>
+                    <table class="centre">
+                        <tr><td>Forum Name:</td><td><input type="text" id="tbDiscussionEditForumName" /></td></tr>
+                    </table>
+                    <br />
+                        <input type="button" value="Rename" id="btnDiscussionsEditForumRename" />
+                        <input type="button" value="Cancel" id="btnDiscussionsEditForumCancel" />
+                        <input type="button" value="Delete" id="btnDiscussionsEditForumDelete" />
+                </div>
+                <div class="loading" id="discussionsEditForumLoading"></div>
+            </div>
+        </div>
+        
+        <script type="text/javascript">
+            var discussionsEditForumOrigTitle = null;
+            var discussionsEditForumID = null;
+
+            $(function () {
+
+                $("#wndDiscussionsEditForum").jqxWindow({ width: '360px', height: '120px', autoOpen: false });
+
+                $("#tbDiscussionEditForumName").jqxInput().width("100%");
+                $("#btnDiscussionsEditForumRename").jqxButton();
+                $("#btnDiscussionsEditForumRename").click(function () {
+                    console.log(discussionsEditForumID);
+                    if (discussionsEditForumID === null)
+                        return;
+
+                    var title = $("#tbDiscussionEditForumName").val().trim();
+                    if (title.length == 0) {
+                        $("#spnDiscussionsEditForumStatus").text("The forum name is not valid.");
+                        $("#spnDiscussionsEditForumStatus").addClass("error");
+                        return;
+                    }
+
+                    if (title === discussionsEditForumOrigTitle) {
+                        $("#spnDiscussionsEditForumStatus").text("The new name is the same as the old name.");
+                        $("#spnDiscussionsEditForumStatus").addClass("error");
+                        return;
+                    }
+
+                    // show loading bar
+                    $("#divDiscussionsEditForumBody").hide();
+                    $("#discussionsEditForumLoading").show();
+
+                    // send request
+                    socket.emit('setDiscussionForumTitle', { id: discussionsEditForumID, title: title });
+                });
+                $("#btnDiscussionsEditForumCancel").jqxButton();
+                $("#btnDiscussionsEditForumCancel").click(function () {
+                    $("#wndDiscussionsEditForum").jqxWindow("hide");
+                });
+                $("#btnDiscussionsEditForumDelete").jqxButton();
+                $("#btnDiscussionsEditForumDelete").click(function () {
+                    $("#wndDiscussionsEditForum").jqxWindow("hide");
+
+                    showDiscussionsDeleteForumWindow(discussionsEditForumOrigTitle, discussionsEditForumID);
+                });
+            });
+
+            var showDiscussionsEditForumWindow = function (title, id) {
+                discussionsEditForumOrigTitle = title;
+                discussionsEditForumID = id;
+
+                $("#tbDiscussionEditForumName").val(title);
+                $("#spnDiscussionsEditForumStatus").text("You are editing '" + title + "'.");
+                $("#spnDiscussionsEditForumStatus").removeClass("error");
+
+                $("#divDiscussionsEditForumBody").show();
+                $("#discussionsEditForumLoading").hide();
+                $("#wndDiscussionsEditForum").jqxWindow("show");
+            };
+
+            var setDiscussionForumTitleResponse = function(data) {
+                if(data.status !== "success") {
+                    $("#spnDiscussionsEditForumStatus").addClass("error");
+
+                    if (data.status === "nopermission")
+                        $("#spnDiscussionsEditForumStatus").text("You don't have permission to edit this forum.");
+                    else
+                        $("#spnDiscussionsEditForumStatus").text("The forum name is not valid.");
+
+                    $("#discussionsEditForumLoading").hide();
+                    $("#divDiscussionsEditForumBody").show();
+                } else {
+                    $("#wndDiscussionsEditForum").jqxWindow("hide");
+                    loadDiscussionsResponse(data);
+                }
+            };
+        </script>
+
+        <!-- discussions - delete forum window -->
+        <div id="wndDiscussionsDeleteForum">
+            <div >Edit Forum</div>
+            <div class="centre">
+                <div id="divDiscussionsDeleteForumBody">
+                    <span id="spnDiscussionsDeleteForumStatus"></span>
+                    <br /><br />
+                        <input type="button" value="Delete Forum" id="btnDiscussionsDeleteForumDelete" />
+                        <input type="button" value="Cancel" id="btnDiscussionsDeleteForumCancel" />
+                </div>
+                <div class="loading" id="discussionsDeleteForumLoading"></div>
+            </div>
+        </div>
+        
+        <script type="text/javascript">
+            var discussionsDeleteForumID = null;
+
+            $(function () {
+
+                $("#wndDiscussionsDeleteForum").jqxWindow({ width: '360px', height: '130px', autoOpen: false });
+
+                $("#btnDiscussionsDeleteForumDelete").jqxButton();
+                $("#btnDiscussionsDeleteForumDelete").click(function () {
+                    // show loading bar
+                    $("#divDiscussionsDeleteForumBody").hide();
+                    $("#discussionsDeleteForumLoading").show();
+
+                    // send request
+                    socket.emit('deleteDiscussionForum', { id: discussionsEditForumID });
+                });
+                $("#btnDiscussionsDeleteForumCancel").jqxButton();
+                $("#btnDiscussionsDeleteForumCancel").click(function () {
+                    $("#wndDiscussionsDeleteForum").jqxWindow("hide");
+                });
+            });
+
+            var showDiscussionsDeleteForumWindow = function (title, id) {
+                discussionsDeleteForumID = id;
+
+                $("#spnDiscussionsDeleteForumStatus").text("Do you wish to delete the forum '" + title + "' and all associated posts and threads?");
+                $("#spnDiscussionsDeleteForumStatus").removeClass("error");
+
+                $("#btnDiscussionsDeleteForumDelete").show();
+                $("#divDiscussionsDeleteForumBody").show();
+                $("#discussionsDeleteForumLoading").hide();
+                $("#wndDiscussionsDeleteForum").jqxWindow("show");
+            };
+
+            var deleteDiscussionForumTitleResponse = function (data) {
+                if (data.status !== "success") {
+                    $("#spnDiscussionsDeleteForumStatus").addClass("error");
+
+                    $("#spnDiscussionsDeleteForumStatus").text("You don't have permission to delete this forum.");
+                    $("#btnDiscussionsDeleteForumDelete").hide();
+
+                    $("#discussionsDeleteForumLoading").hide();
+                    $("#divDiscussionsDeleteForumBody").show();
+                } else {
+                    $("#wndDiscussionsDeleteForum").jqxWindow("hide");
+                    loadDiscussionsResponse(data);
+                }
+            };
+        </script>
+
+        <!-- forums page -->
+        <div id="divForumsPage" style="display:none;">
+            <table width="100%"><tr><td width="30%" valign="top">
+                <!-- left column -->
+                <div class="panel">
+                    <div class="panel-header">Forum</div>
+                    <div class="panel-body">
+                        <div class="loading-fixed" id="Div2"></div>
+                        <div id="Div3"></div>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">Recent Forum Posts</div>
+                    <div class="panel-body">
+                        <div class="loading-fixed" id="Div4"></div>
+                        <div id="Div5"></div>
+                    </div>
+                </div>
+            </td><td width="70%" valign="top">
+                <!-- middle/right column -->
+                <div class="panel">
+                    <div class="panel-header">Threads</div>
+                    <div class="panel-body">
+                        <div class="loading-fixed" id="Div6"></div>
+                        <div id="Div7"></div>
+                    </div>
+                </div>
+            </td></tr></table>
+        </div>
+        <script type="text/javascript">
+            var showForumsPage = function (id) {
+                $("#divForumsPage").show();
+
+                socket.emit("loadForum", null);
+            };
+            
+            var loadForumResponse = function (data) {
+                $("#discussionsPageThreadsLoading").hide();
+                
                 $("#discussionsPageThreads").show();
 
-                html = "<ul>";
-                for (var i = 0 ; i < data.posts.length; i++) {
-                    html += "<li><small><a href='#threads/" + data.posts[i].thread_id + "/" + data.posts[i].post_id + "'>" + data.posts[i].thread_title + "</a> ";
-                    html += "in <a href='#forums/" + data.posts[i].forum_id + "'>" + data.posts[i].forum_title + "</a><br /><i>";
-                    html += data.posts[i].preview;
-                    html += "</i><br />Posted by <a href='#members/" + data.posts[i].post_by + "'>" + data.posts[i].post_by_username + "</a> ";
-                    html += "on " + data.posts[i].posted + "</small></li>";
-                }
-                html += "</ul>";
-                $("#discussionPagePosts").html(html);
-                $("#discussionPagePosts").show();
-
-                html = "<table class='alternating-table' width='100%'>";
-                for (var i = 0; i < data.forums.length; i++) {
-                    html += "<tr><td>";
-                    html += "<a href='#forums/" + data.forums[i].forum_id + "'>" + data.forums[i].forum_title + "</a><br />";
-                    html += "</td><td><small>";
-                    if (data.forums[i].latest_post_title !== null) {
-                        html += "Latest post in <a href='#threads/" + data.forums[i].latest_thread_id + "'>";
-                        html += data.forums[i].latest_post_title + "</a> by ";
-                        html += "<a href='#members/" + data.forums[i].latest_post_uid + "'>" + data.forums[i].latest_post_realname + "</a> ";
-                        html += "on " + data.forums[i].latest_post;
-                    } else
-                       html += "No posts.";
-                    html += "</small></td></tr>";
-                }
-                html += "</table>";
-
-                $("#discussionPageForums").html(html);
-                $("#discussionPageForums").show();
-
-                console.log(data);
+                
             };
         </script>
 
@@ -577,6 +911,9 @@
             var userid = null; // id of the logged in user
             var username = ""; // username, used when registering, verifying email, etc
             var realname = ""; // realname of the logged in user
+            var forumAdmin = false;
+            var forumModerator = false;
+            var userinfo = null;
             
             var resize = function () {
                 var windowHeight = window.innerHeight;
@@ -589,10 +926,6 @@
                 $("#userDropDown").css("left", windowWidth - $("#userDropDown").width());
             };
 
-            var reloadPage = function () {
-                console.log("load page");
-            };
-
             var logout = function() {
                 socket.emit("logout", null);
                 loggedIn = false;
@@ -601,6 +934,9 @@
                 $("#loginName").text("Log in");
                 // forget that we were logged in, so we don't log back in when the user reloads the page
                 clearCookies();
+
+                forumAdmin = false;
+                forumModerator = false;
 
                 if (globalSettings.publicAccess == false)
                     $(window).hashchange();
@@ -668,7 +1004,14 @@
                 socket.on('createUserResponse', createUserResponse);
                 socket.on('verifyEmailResponse', verifyEmailResponse);
 
+                socket.on('loadHomePageResponse', loadHomePageResponse);
+
                 socket.on('loadDiscussionsResponse', loadDiscussionsResponse);
+                socket.on('createDiscussionForumResponse', createDiscussionForumResponse);
+                socket.on('setDiscussionForumTitleResponse', setDiscussionForumTitleResponse);
+                socket.on('deleteDiscussionForumResponse', deleteDiscussionForumTitleResponse);
+
+                socket.on('loadForumResponse', loadForumResponse);
 
                 $(window).hashchange(hashchange);
             });
@@ -678,14 +1021,13 @@
             var loadPage = function (page, noredirect) {
             };
 
-            // reload the current page
-            var reloadPage = function () {
-            };
 
             // hide all existing pages so we can later only show the one we want
             var hideExistingPages = function () {
                 $("#divHomePage").hide();
                 $("#divDiscussionsPage").hide();
+                $("#wndDiscussionsNewForum").jqxWindow("hide");
+                $("#divForumsPage").hide();
             };
 
             var hashchange = function () {
@@ -698,9 +1040,12 @@
                     hash = ''; // homepage if there's no public access
                 
                 var leftSection = hash;
+                var rightSection = "";
                 var splitter = hash.indexOf('/');
-                if (splitter >= 0)
+                if (splitter >= 0) {
+                    rightSection = leftSection.substr(splitter + 1);
                     leftSection = leftSection.substr(0, splitter);
+                }
 
                 // hide all existing tabs
                 hideExistingPages();
@@ -710,7 +1055,7 @@
                     case "#blogs": break;
                     case "#courses": break;
                     case "#discussions": showDiscussionsPage(); break;
-                    case "#forums": break;
+                    case "#forums": showForumsPage(rightSection); break;
                     case "#threads": break;
                     case "#events": break;
                     case "#members": break;

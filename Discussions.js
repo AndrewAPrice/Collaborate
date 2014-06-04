@@ -21,3 +21,15 @@ exports.getRecentPosts = function(callback) {
 exports.getDiscussionForums = function(callback) {
     Database.getDiscussionForums(callback);
 };
+
+exports.createDiscussionForum = function(title, callback) {
+    Database.createDiscussionForum(title, callback);
+};
+
+exports.setDiscussionForumTitle = function(id, title, callback) {
+    Database.setDiscussionForumTitle(id, title, callback);
+};
+
+exports.deleteDiscussionForum = function(id, callback) {
+    Database.deleteDiscussionForum(id, callback);
+};

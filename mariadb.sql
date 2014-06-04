@@ -10,7 +10,7 @@ Target Server Type    : MariaDB
 Target Server Version : 100011
 File Encoding         : 65001
 
-Date: 2014-06-02 17:22:27
+Date: 2014-06-04 16:48:47
 */
 
 SET FOREIGN_KEY_CHECKS=0;
@@ -41,7 +41,7 @@ CREATE TABLE `discussion_forums` (
   `link_id` int(10) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `Index 1` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8;
 
 -- ----------------------------
 -- Table structure for discussion_posts
@@ -58,7 +58,7 @@ CREATE TABLE `discussion_posts` (
   `preview` text NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;
 
 -- ----------------------------
 -- Table structure for discussion_threads
@@ -73,9 +73,10 @@ CREATE TABLE `discussion_threads` (
   `last_post` datetime NOT NULL,
   `posts` int(1) unsigned NOT NULL,
   `views` int(11) unsigned NOT NULL,
+  `last_post_by` int(10) unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;
 
 -- ----------------------------
 -- Table structure for menu
@@ -115,6 +116,8 @@ CREATE TABLE `users` (
   `enabled` bit(1) NOT NULL,
   `last_login` datetime DEFAULT NULL,
   `admin` bit(1) NOT NULL,
+  `forum_admin` bit(1) NOT NULL,
+  `forum_moderator` bit(1) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `Index 1` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;
@@ -221,12 +224,12 @@ DELIMITER ;
 -- ----------------------------
 DROP PROCEDURE IF EXISTS `create_discussion_forum`;
 DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `create_discussion_forum`(IN `_title` VARCHAR(255), OUT `_id` INT)
+CREATE DEFINER=`root`@`localhost` PROCEDURE `create_discussion_forum`(IN `i_title` VARCHAR(255))
 BEGIN
 	START TRANSACTION;
 	INSERT INTO discussion_forums (title, link_type)
-		VALUES (_title, 'discussion');
-	SET _id = LAST_INSERT_ID();
+		VALUES (i_title, 'discussion');
+	SELECT LAST_INSERT_ID() id;
 	COMMIT;
 END
 ;;
@@ -251,16 +254,16 @@ BEGIN
 			INSERT INTO discussion_posts
 				(forum_id, thread_id, posted, modified, posted_by, body, preview)
 			VALUES
-				(_forum_id, i_thread_id, NOW(), NULL, user_id, i_body, i_preview);
+				(_forum_id, i_thread_id, NOW(), NULL, i_user_id, i_body, i_preview);
 
 			SET o_id = LAST_INSERT_ID();
 
-			SELECT COUNT(1) FROM dicussion_posts WHERE thread_id = i_thread_id INTO o_posts;
+			SELECT COUNT(1) FROM discussion_posts WHERE thread_id = i_thread_id INTO o_posts;
 			
 			UPDATE
 				discussion_threads
 			SET
-				posts = o_posts, last_post = NOW()
+				posts = o_posts, last_post = NOW(), last_post_by = i_user_id
 			WHERE
 				id = i_thread_id;
 
@@ -287,9 +290,9 @@ BEGIN
 		SET o_post_id = NULL;
 	ELSE
 		INSERT INTO discussion_threads
-			(forum_id, title, created, created_by, last_post, posts, views)
+			(forum_id, title, created, created_by, last_post, posts, views, last_post_by)
 		VALUES
-			(i_forum_id, i_title, NOW(), i_user_id, NOW(), 1, 1);
+			(i_forum_id, i_title, NOW(), i_user_id, NOW(), 1, 1, i_user_id);
 
 		SET o_id = LAST_INSERT_ID();
 
@@ -340,8 +343,8 @@ BEGIN
 	ELSE
 		SET o_status = 'success';
 		SET _token = FLOOR(RAND() * 10000000);
-		INSERT INTO users (username, realname, password, email, token, enabled, admin)
-			VALUES (lcase(i_username), i_realname, NULL, i_email, _token, 1, 0);
+		INSERT INTO users (username, realname, password, email, token, enabled, admin, forum_admin, forum_moderator)
+			VALUES (lcase(i_username), i_realname, NULL, i_email, _token, 1, 0, 0, 0);
 		SELECT _token as token;
 	END IF;
 	COMMIT;
@@ -422,10 +425,15 @@ DROP PROCEDURE IF EXISTS `delete_discussion_forum`;
 DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` PROCEDURE `delete_discussion_forum`(IN `i_id` int)
 BEGIN
+	DECLARE _link_type VARCHAR(255);
 	START TRANSACTION;
-	DELETE FROM discussion_forums WHERE id = _id;
-	DELETE FROM discussion_threads WHERE forum_id = _id;
-	DELETE FROM discussion_posts WHERE forum_id = _id;
+	SELECT link_type FROM discussion_forums WHERE id = i_id INTO _link_type;
+
+	IF _link_type = 'discussion' THEN
+		DELETE FROM discussion_forums WHERE id = i_id;
+		DELETE FROM discussion_threads WHERE forum_id = i_id;
+		DELETE FROM discussion_posts WHERE forum_id = i_id;
+	END IF;
 	COMMIT;
 END
 ;;
@@ -565,7 +573,33 @@ DROP PROCEDURE IF EXISTS `get_discussion_forums`;
 DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_discussion_forums`()
 BEGIN
-	SELECT id, title FROM discussion_forums WHERE link_type = 'discussion';
+	SELECT
+		f.id forum_id,
+		f.title forum_title,
+		t.title latest_post_title,
+		t.id latest_thread_id,
+		t.last_post latest_post,
+		t.last_post_by latest_post_uid,
+		u.realname latest_post_realname
+	FROM
+		discussion_forums f LEFT JOIN
+		discussion_threads t on f.id = t.forum_id LEFT JOIN
+		users u on u.id = t.last_post_by
+	WHERE
+		f.link_type = 'discussion' AND
+		(t.id IS NULL OR
+		t.id = (
+ 			SELECT
+				id
+			FROM
+				discussion_threads
+			WHERE
+				forum_id = f.id
+			ORDER BY
+				last_post
+			LIMIT 1))
+	ORDER BY
+		f.title;
 END
 ;;
 DELIMITER ;
@@ -611,23 +645,6 @@ END
 DELIMITER ;
 
 -- ----------------------------
--- Procedure structure for get_latest_discussion_threads
--- ----------------------------
-DROP PROCEDURE IF EXISTS `get_latest_discussion_threads`;
-DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `get_latest_discussion_threads`(IN `i_offset` int,IN `i_rows` int,OUT `o_total` int)
-BEGIN
-	SELECT count(1) FROM discussion_threads INTO o_total;
-
-	SELECT id, forum_id, title, created, created_by, last_post, posts, views
-		FROM discussion_threads
-		ORDER BY last_post DESC
-		LIMIT i_offset, i_rows;
-END
-;;
-DELIMITER ;
-
--- ----------------------------
 -- Procedure structure for get_menu_items
 -- ----------------------------
 DROP PROCEDURE IF EXISTS `get_menu_items`;
@@ -635,6 +652,63 @@ DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_menu_items`()
 BEGIN
 	SELECT * FROM menu;
+END
+;;
+DELIMITER ;
+
+-- ----------------------------
+-- Procedure structure for get_recent_discussion_posts
+-- ----------------------------
+DROP PROCEDURE IF EXISTS `get_recent_discussion_posts`;
+DELIMITER ;;
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_recent_discussion_posts`()
+BEGIN
+	SELECT	
+		p.id post_id,
+		p.preview preview,
+		t.forum_id forum_id,
+		f.title forum_title,
+		t.title thread_title,
+		t.id thread_id,
+		p.posted posted,
+		p.posted_by post_by,
+		u.realname post_by_username
+	FROM
+		discussion_posts p LEFT JOIN
+		discussion_threads t on t.id = p.thread_id LEFT JOIN
+		discussion_forums f ON f.id = t.forum_id LEFT JOIN
+		users u ON u.id = p.posted_by
+	ORDER BY
+		p.posted DESC
+	LIMIT 10;
+END
+;;
+DELIMITER ;
+
+-- ----------------------------
+-- Procedure structure for get_recent_discussion_threads
+-- ----------------------------
+DROP PROCEDURE IF EXISTS `get_recent_discussion_threads`;
+DELIMITER ;;
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_recent_discussion_threads`()
+BEGIN
+	SELECT	
+		t.id thread_id,
+		t.forum_id forum_id,
+		f.title forum_title,
+		t.title thread_title,
+		t.last_post last_post,
+		t.last_post_by last_post_by,
+		u.realname last_post_by_username,
+		t.posts posts,
+		t.views views
+	FROM
+		discussion_threads t LEFT JOIN
+		discussion_forums f ON f.id = t.forum_id LEFT JOIN
+		users u ON u.id = t.last_post_by
+	ORDER BY
+		last_post DESC
+	LIMIT 10;
 END
 ;;
 DELIMITER ;
@@ -658,7 +732,19 @@ DROP PROCEDURE IF EXISTS `get_user_information`;
 DELIMITER ;;
 CREATE DEFINER=`root`@`localhost` PROCEDURE `get_user_information`(IN `i_id` INT)
 BEGIN
-	SELECT username, realname, email, enabled, last_login, admin FROM users WHERE id = i_id;
+	SELECT username, realname, email, enabled, last_login, admin, forum_admin, forum_moderator FROM users WHERE id = i_id;
+END
+;;
+DELIMITER ;
+
+-- ----------------------------
+-- Procedure structure for get_user_login_information
+-- ----------------------------
+DROP PROCEDURE IF EXISTS `get_user_login_information`;
+DELIMITER ;;
+CREATE DEFINER=`root`@`localhost` PROCEDURE `get_user_login_information`(IN `i_id` INT)
+BEGIN
+	SELECT realname, forum_admin, forum_moderator FROM users WHERE id = i_id;
 END
 ;;
 DELIMITER ;
@@ -836,14 +922,14 @@ END
 DELIMITER ;
 
 -- ----------------------------
--- Procedure structure for set_dicussion_forum_title
+-- Procedure structure for set_discussion_forum_title
 -- ----------------------------
-DROP PROCEDURE IF EXISTS `set_dicussion_forum_title`;
+DROP PROCEDURE IF EXISTS `set_discussion_forum_title`;
 DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `set_dicussion_forum_title`(IN `_id` INT, IN `_title` VARCHAR(255))
+CREATE DEFINER=`root`@`localhost` PROCEDURE `set_discussion_forum_title`(IN `i_id` INT, IN `i_title` VARCHAR(255))
 BEGIN
 	START TRANSACTION;
-	UPDATE attachments SET title = _title WHERE id = _id AND link_type = 'discussion';
+	UPDATE discussion_forums SET title = i_title WHERE id = i_id AND link_type = 'discussion';
 	COMMIT;
 END
 ;;
